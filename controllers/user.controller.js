@@ -17,25 +17,27 @@ getUsers : async (req, res) => {
     console.log("bef")
   try {
     const page = Number(req.query.page) || 1;
-    const limit = Number(req.query.limit) || 10;
+    const limit = Number(req.query.limit) || 3;
     const search = req.query.search || "";
     const role = req.query.role || "";
+    const isVerified = req.query.isVerified ;
     const sort = req.query.sort || "-createdAt";
 
-    const { users, total } = await userService.getAllUsersService(
+    const { users, totalFilteredUsers } = await userService.getAllUsersService(
     {  page,
       limit,
       search,
       sort,
-      role}
+      role,
+    isVerified}
     );
 
     res.status(200).json({
       success: true,
-      total,
+      totalFilteredUsers,
       page,
-      pages: Math.ceil(total / limit),
-      count: users.length,
+      pages: Math.ceil(totalFilteredUsers / limit),
+      countReturned: users.length,
       data: users,
     });
   } catch (error) {
@@ -87,11 +89,31 @@ updateUser : async (req, res, next) => {
 
   } catch (error) {
    res.status(400).json({
-    message:error.stack
+    message:error.message
    })
   }
 }
+,
 
+changePassword: async (req, res) => {
+  console.log('hhhhhhhhhhhhhhhhh')
+    try {
+
+        const result = await userService.changePassword(req.user.id,req.body);
+
+        res.status(200).json({
+            success: true,
+            message: "Password changed successfully",
+            data: result
+        });
+
+    } catch (error) {
+        res.status(400).json({
+          success:false,
+          message:error.message
+        })
+    }
+}
 
 }
 module.exports=userController

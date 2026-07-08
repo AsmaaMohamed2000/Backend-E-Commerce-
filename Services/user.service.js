@@ -2,6 +2,7 @@ const User = require('../models/user.model')
 const uploade=require('../middlewares/uploads')
 const cloudinary=require('../config/cloudinary')
 const uploadCloudinary=require('../utilities/cloudinary')
+const bcrypt=require('bcryptjs')
 const userService={
 addUser : async (data) => {
   
@@ -35,11 +36,12 @@ addUser : async (data) => {
 
 
 getAllUsersService: async ({
-  page = 1,
-  limit = 10,
-  search = "",
-  sort = "-createdAt",
-  role = "",
+  page ,
+  limit ,
+  search ,
+  sort ,
+  role ,
+  isVerified
   
 }) => {
   const match = {};
@@ -53,6 +55,9 @@ getAllUsersService: async ({
 
   if (role) {
     match.role = role;
+  }
+  if (isVerified!==undefined) {
+    match.isVerified = isVerified==='true';
   }
 
   const pipeline = [];
@@ -84,14 +89,15 @@ getAllUsersService: async ({
     resetPasswordExpire:0,tokens:0
     },
   });
+   const totalFilteredUsers = await User.countDocuments(match);
 console.log("bef")
   const users = await User.aggregate(pipeline);
 console.log("aft")
-  const total = await User.countDocuments(match);
+ 
 
   return {
     users,
-    total,
+    totalFilteredUsers,
   };
 },
 
@@ -143,7 +149,9 @@ updateUser : async (req) => {
             updates[field] = req.body[field];
         }
     });
-
+if(req.body.password){
+  delete req.body.password
+}
     if (isAdmin) {
 
         ["role", "isVerified"].forEach(field => {
@@ -153,6 +161,16 @@ updateUser : async (req) => {
         });
 
     }
+    // if(isOwner&&req.body.currentPassword&&req.body.newPassword){
+     
+    //   const isMatch=  await bcrypt.compare(req.body.currentPassword,user.password)
+    //   if(!isMatch){
+    //     throw new Error('current password incorrect')
+     
+    //   }
+    //   user.password=req.body.newPassword
+      
+    // }
 
     // Avatar
     if (req.file) {
@@ -178,9 +196,9 @@ updateUser : async (req) => {
         ).length;
 
         if (defaultCount > 1) {
-            throw new AppError(
+            throw new   Error(
                 "Only one default address is allowed",
-                400
+              
             );
         }
 
@@ -191,8 +209,45 @@ updateUser : async (req) => {
 
     await user.save();
 
-    return req.user.username;
+    return user;
 
+},
+changePassword: async (id,data) => {
+
+    const { currentPassword, newPassword } = data
+
+    if (!currentPassword || !newPassword) {
+        throw new Error("Current password and new password are required");
+    }
+
+    const user = await User.findById(id).select("+password");
+
+    if (!user) {
+        throw new Error("User not found");
+    }
+
+    const isMatch = await user.comparePassword(currentPassword);
+
+    if (!isMatch) {
+        throw new Error("Current password is incorrect");
+    }
+const samePassword = await user.comparePassword(
+    newPassword
+);
+
+if (samePassword) {
+    throw new Error(
+        "New password must be different from current password"
+    );
+}
+    user.password = newPassword;
+
+    await user.save();
+
+    return {
+        message: "Password updated successfully",
+        user
+    };
 }
 
 }

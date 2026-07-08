@@ -98,6 +98,24 @@ const loginSchema = Joi.object({
     .required()
 
 })
+const changePasswordSchema=Joi.object({
+  currentPassword: Joi.string()
+    .pattern(passwordPattern)
+    .required()
+    .messages({
+      'string.empty':'current Password is required',
+      'string.pattern.base':
+      'current Password must contain at least one  uppercase letter,one lowercase letter, one number and one special character'
+    }),
+  newPassword: Joi.string()
+    .pattern(passwordPattern)
+    .required()
+    .messages({
+      'string.empty':'new Password is required',
+      'string.pattern.base':
+      'new Password must contain at least one  uppercase letter,one lowercase letter, one number and one special character'
+    }),
+})
 
 // const editUserInfoSchema=Joi.object({
 //    fullName: Joi.string()
@@ -131,4 +149,4 @@ const loginSchema = Joi.object({
 //     })
 
 // })
-module.exports={registerSchema,verifyOtpSchema,loginSchema,resetPasswordSchema,forgotPasswordSchema}
+module.exports={registerSchema,verifyOtpSchema,changePasswordSchema,loginSchema,resetPasswordSchema,forgotPasswordSchema}
