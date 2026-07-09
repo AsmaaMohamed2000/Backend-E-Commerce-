@@ -5,7 +5,7 @@
   "scripts": {
     "server": "nodemon server.js",
     "start": "nodemon server.js",
-    "seedAdmin":"nodemon seed/seedAdmin"
+    "seedAdmin": "nodemon seed/seedAdmin"
   },
   "keywords": [],
   "author": "",
@@ -27,6 +27,7 @@
     "multer": "^2.2.0",
     "nodemailer": "^9.0.3",
     "resend": "^6.12.4",
+    "slugify": "^1.6.9",
     "streamifier": "^0.1.1",
     "stripe": "^22.1.1"
   },
