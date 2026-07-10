@@ -7,6 +7,7 @@ const cookieParser = require('cookie-parser')
 const authRoutes=require('./routes/auth.route')
 const userRoutes=require('./routes/user.route')
 const productRoutes=require('./routes/product.route')
+const errMiddleware=require('./middlewares/error.middleware')
 const cors=require('cors')
 const connectDB=require('./config/db')
 
@@ -41,6 +42,7 @@ app.use('/api/auth',authRoutes)
 app.use('/api/users',userRoutes)
 
 app.use('/api/products',productRoutes)
+app.use(errMiddleware)
 app.listen(PORT,()=>{
     console.log(`server running on port ${PORT}`)
 })

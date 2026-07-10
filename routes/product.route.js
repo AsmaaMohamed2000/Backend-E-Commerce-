@@ -13,7 +13,7 @@ router.post(
     productController.createProduct
 );
 router.get('/',productController.getProducts)
-router.get('/search',productController.searchProducts)
+router.get('/search',productController.getProducts)
 router.get('/:id',productController.getProduct)
 router.put(
     "/update/:id",
