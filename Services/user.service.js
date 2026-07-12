@@ -1,216 +1,241 @@
 const User = require('../models/user.model')
 const uploade=require('../middlewares/uploads')
 const cloudinary=require('../config/cloudinary')
+const crypto = require("crypto");
+const AppError = require("../errors/AppError");
 const uploadCloudinary=require('../utilities/cloudinary')
+const {USER_ERRORS,USER_SUCCESS}=require('../constants/errors')
+const sendEmail = require("../utilities/sendEmail");
 const bcrypt=require('bcryptjs')
 const userService={
-addUser : async (data) => {
-  
-    const { username, email, password, phone, role,addresses } = data;
+addUser: async (data) => {
+  const {
+    username,
+    email,
+    password,
+    phone,
+    role,
+    addresses,
+  } = data;
 
-    const user = await User.findOne({ email });
+  const existingUser = await User.findOne({ email });
 
-    if (user) {
-     throw new Error('email already exist')
-    }
+  if (existingUser) {
+    throw new AppError(USER_ERRORS.USER_ALREADY_EXISTS, 409);
+  }
 
-    const newUser = await User.create({
-      username,
-      email,
-      password,
-      phone,
-      role,
-      addresses,
-      isVerified: true,
-    });
+  const user = await User.create({
+    username,
+    email,
+    password,
+    phone,
+    role,
+    addresses,
+    isVerified: true,
+  });
 
-    return {
-         success: true,
-      message: "User created successfully",
-      data: newUser,
-    }
-  
+  const resetToken = crypto.randomBytes(32).toString("hex");
+
+  const hashedToken = crypto
+    .createHash("sha256")
+    .update(resetToken)
+    .digest("hex");
+
+  user.resetPasswordToken = hashedToken;
+  user.resetPasswordExpire = Date.now() + 10 * 60 * 1000;
+
+  await user.save({ validateBeforeSave: false });
+
+ const resetUrl = `${process.env.CLIENT_URL}/reset-password/${resetToken};`
+   try {
+  await sendEmail({
+    email: user.email,
+    subject: "Set Your Password",
+    resetUrl,
+    type: "set-password",
+  });
+} catch (error) {
+  user.resetPasswordToken = null;
+  user.resetPasswordExpire = null;
+  await user.save({ validateBeforeSave: false });
+
+  throw new AppError("Failed to send email", 500);
+}
+
+  return {
+    success: true,
+    message: USER_SUCCESS.USER_CREATED,
+    data: user,
+  };
 },
-
-
-
-
-getAllUsersService: async ({
-  page ,
-  limit ,
-  search ,
-  sort ,
-  role ,
-  isVerified
-  
+getAllUsers: async ({
+  page = 1,
+  limit = 10,
+  search,
+  sort = "-createdAt",
+  role,
+  isVerified,
 }) => {
-  const match = {};
+  const filter = {};
 
   if (search) {
-    match.$or = [
+    filter.$or = [
       { username: { $regex: search, $options: "i" } },
       { email: { $regex: search, $options: "i" } },
     ];
   }
 
   if (role) {
-    match.role = role;
-  }
-  if (isVerified!==undefined) {
-    match.isVerified = isVerified==='true';
+    filter.role = role;
   }
 
-  const pipeline = [];
-
-  pipeline.push({ $match: match });
+  if (isVerified !== undefined) {
+    filter.isVerified = isVerified === "true";
+  }
 
   const sortField = sort.startsWith("-") ? sort.slice(1) : sort;
   const sortOrder = sort.startsWith("-") ? -1 : 1;
 
-  pipeline.push({
-    $sort: {
-      [sortField]: sortOrder,
-    },
-  });
+  const totalUsers = await User.countDocuments(filter);
 
-  pipeline.push({
-    $skip: (page - 1) * limit,
-  });
-
-  pipeline.push({
-    $limit: limit,
-  });
-
-  pipeline.push({
-    $project: {
-      password: 0,
-      refreshToken: 0,
-       resetPasswordToken:0,
-    resetPasswordExpire:0,tokens:0
-    },
-  });
-   const totalFilteredUsers = await User.countDocuments(match);
-console.log("bef")
-  const users = await User.aggregate(pipeline);
-console.log("aft")
- 
-
-  return {
-    users,
-    totalFilteredUsers,
-  };
-},
-
-getUserByIdService : async (id) => {
-  const user = await User.findById(id).select(
-    "-password -tokens -resetPasswordToken -resetPasswordExpire -__v"
-  );
-
-  if (!user) {
-    throw new Error("User not found");
-  }
-
-  return user;
-},
-deleteUserService :async (id) => {
-  const user = await User.findById(id);
-
-  if (!user) {
-    throw new Error("User not found");
-  }
-
-  await User.findByIdAndDelete(id);
+  const users = await User.find(filter)
+    .select("-password -tokens -resetPasswordToken -resetPasswordExpire -__v")
+    .sort({ [sortField]: sortOrder })
+    .skip((page - 1) * limit)
+    .limit(Number(limit));
 
   return {
     success: true,
-    message: "User deleted successfully",
+    page: Number(page),
+    totalPages: Math.ceil(totalUsers / limit),
+    totalUsers,
+    countReturned: users.length,
+    data: users,
   };
 },
-updateUser : async (req) => {
 
-    const user = await User.findById(req.params.id);
+getUserById: async (id) => {
+  const user = await User.findById(id)
+    .select("-password -tokens -resetPasswordToken -resetPasswordExpire -__v");
 
-    if (!user) {
-        throw new Error("User not found")
+  if (!user) {
+    throw new AppError(USER_ERRORS.USER_NOT_FOUND, 404);
+  }
+
+  return {
+    success: true,
+    data: user,
+  };
+},
+deleteUser: async (id) => {
+  const user = await User.findById(id);
+
+  if (!user) {
+    throw new AppError(USER_ERRORS.USER_NOT_FOUND, 404);
+  }
+
+  // Delete avatar from Cloudinary
+  if (user.avatar?.publicId) {
+    await cloudinary.uploader.destroy(user.avatar.publicId);
+  }
+
+  await user.deleteOne();
+
+  return {
+    success: true,
+    message: USER_SUCCESS.USER_DELETED,
+  };
+},
+updateUser: async (id, currentUser, data, file) => {
+  const user = await User.findById(id);
+  console.log(file)
+
+  if (!user) {
+    throw new AppError(USER_ERRORS.USER_NOT_FOUND, 404);
+  }
+
+  const isAdmin = currentUser.role === "admin";
+  const isOwner = currentUser.id.toString() === user._id.toString();
+
+  if (!isAdmin && !isOwner) {
+    throw new AppError(USER_ERRORS.UNAUTHORIZED, 403);
+  }
+
+ 
+  const updates = {};
+
+  if (data.username !== undefined) {
+    updates.username = data.username;
+  }
+
+  if (data.phone !== undefined) {
+    updates.phone = data.phone;
+  }
+
+  if (isAdmin) {
+    if (data.role !== undefined) {
+       throw new AppError(
+        USER_ERRORS.ROLE_ROUTE,
+        400
+      );
     }
 
-    const isAdmin = req.user.role === "admin";
-    const isOwner = req.user.id.toString() === user._id.toString();
+    if (data.isVerified !== undefined) {
+      updates.isVerified = data.isVerified;
+    }
+  }
 
-    if (!isAdmin && !isOwner) {
-         throw new Error("Unauthorized")
-        
+  if (data.addresses !== undefined) {
+    if (!Array.isArray(data.addresses)) {
+      throw new AppError(
+        USER_ERRORS.INVALID_ADDRESSES,
+        400
+      );
     }
 
-    const updates = {};
+    const defaultAddresses = data.addresses.filter(
+      (address) => address.isDefault
+    );
 
-    ["username", "phone"].forEach(field => {
-        if (req.body[field] !== undefined) {
-            updates[field] = req.body[field];
-        }
-    });
-if(req.body.password){
-  delete req.body.password
-}
-    if (isAdmin) {
-
-        ["role", "isVerified"].forEach(field => {
-            if (req.body[field] !== undefined) {
-                updates[field] = req.body[field];
-            }
-        });
-
-    }
-    // if(isOwner&&req.body.currentPassword&&req.body.newPassword){
-     
-    //   const isMatch=  await bcrypt.compare(req.body.currentPassword,user.password)
-    //   if(!isMatch){
-    //     throw new Error('current password incorrect')
-     
-    //   }
-    //   user.password=req.body.newPassword
-      
-    // }
-
-    // Avatar
-    if (req.file) {
-
-        if (user.avatar.publicId) {
-            await cloudinary.uploader.destroy(user.avatar.publicId);
-        }
-
-        const image = await uploadCloudinary(req.file.buffer,'users');
-
-        updates.avatar = {
-            url: image.secure_url,
-            publicId: image.public_id
-        };
-
+    if (defaultAddresses.length > 1) {
+      throw new AppError(
+        USER_ERRORS.MULTIPLE_DEFAULT_ADDRESSES,
+        400
+      );
     }
 
-    // Addresses
-    if (Array.isArray(req.body.addresses)) {
+    updates.addresses = data.addresses;
+  }
 
-        const defaultCount = req.body.addresses.filter(
-            address => address.isDefault
-        ).length;
+  if (file) {
+    const image = await uploadCloudinary(file.buffer, "users");
 
-        if (defaultCount > 1) {
-            throw new   Error(
-                "Only one default address is allowed",
-              
-            );
-        }
-
-        updates.addresses = req.body.addresses;
+    if (user.avatar?.publicId) {
+      await cloudinary.uploader.destroy(user.avatar.publicId);
     }
 
-    Object.assign(user, updates);
+    updates.avatar = {
+      url: image.secure_url,
+      publicId: image.public_id,
+    };
+  }
 
-    await user.save();
+  if (Object.keys(updates).length === 0) {
+    throw new AppError(
+      USER_ERRORS.NO_UPDATE_DATA,
+      400
+    );
+  }
 
-    return user;
+  Object.assign(user, updates);
 
+  await user.save();
+
+  return {
+    success: true,
+    message: USER_SUCCESS.USER_UPDATED,
+    data: user,
+  };
 },
 changePassword: async (id,data) => {
 

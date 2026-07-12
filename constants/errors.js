@@ -10,5 +10,55 @@ const PRODUCT_ERRORS = {
     REVIEW_NOT_FOUND: "Review not found",
     FORBIDDEN: "You are not authorized to perform this action"
 };
+const CART_ERRORS = {
+    CART_NOT_FOUND: "Cart not found",
 
-module.exports = { PRODUCT_ERRORS };
+    PRODUCT_ALREADY_IN_CART: "Product already exists in cart",
+
+    PRODUCT_NOT_IN_CART: "Product not found in cart",
+
+    INSUFFICIENT_STOCK: "Insufficient stock available",
+
+    CART_IS_EMPTY: "Cart is empty",
+
+    INVALID_COUPON: "Invalid coupon code",
+
+    COUPON_ALREADY_APPLIED: "Coupon is already applied",
+
+    NO_COUPON_APPLIED: "No coupon applied",
+
+    PRODUCT_INACTIVE: "This product is no longer available",
+
+    QUANTITY_EXCEEDS_STOCK: "Requested quantity exceeds available stock"
+};
+const WISHLIST_ERRORS = {
+    WISHLIST_NOT_FOUND: "Wishlist not found",
+    WISHLIST_IS_EMPTY: "Wishlist is empty",
+    PRODUCT_ALREADY_EXISTS: "Product already exists in wishlist",
+    PRODUCT_NOT_FOUND: "Product not found in wishlist",
+};
+const USER_ERRORS = {
+  USER_NOT_FOUND: "User not found",
+  USER_ALREADY_EXISTS: "User already exists",
+  UNAUTHORIZED: "Unauthorized",
+
+  NO_UPDATE_DATA: "No data provided to update",
+  INVALID_ADDRESSES: "Addresses must be an array",
+  USE_CHANGE_PASSWORD_ROUTE:
+    "Use the change password route to update your password",
+  MULTIPLE_DEFAULT_ADDRESSES:
+    "Only one default address is allowed",
+
+  ROLE_ROUTE: "Go to change role route",
+};
+
+const USER_SUCCESS = {
+  USER_CREATED: "User created successfully",
+  USER_UPDATED: "User updated successfully",
+  USER_DELETED: "User deleted successfully",
+  PASSWORD_CHANGED: "Password changed successfully",
+};
+
+
+module.exports = { USER_ERRORS,
+  USER_SUCCESS, PRODUCT_ERRORS ,CART_ERRORS,WISHLIST_ERRORS};

@@ -8,9 +8,9 @@ const upload=require('../middlewares/uploads')
 router.post("/add", auth.auth, auth.adminOnly('admin'), userController.addUser);
 router.post("/change-password", auth.auth, auth.validate(validateSchemas.changePasswordSchema), userController.changePassword);
 
-router.get("/all", auth.auth, auth.adminOnly("admin"), userController.getUsers);
+router.get("/all", auth.auth, auth.adminOnly("admin"), userController.getAllUsers);
 
-router.get("/:id", auth.auth, auth.adminOnly("admin"), userController.getUser);
+router.get("/:id", auth.auth, auth.adminOnly("admin"), userController.getUserById);
 
 router.patch("/:id", auth.auth,upload.single('avatar'), userController.updateUser);
 

@@ -116,7 +116,11 @@ const changePasswordSchema=Joi.object({
       'new Password must contain at least one  uppercase letter,one lowercase letter, one number and one special character'
     }),
 })
-
+const changeRoleSchema = Joi.object({
+    role: Joi.string()
+        .valid("admin", "customer")
+        .required()
+});
 // const editUserInfoSchema=Joi.object({
 //    fullName: Joi.string()
 //     .trim()
@@ -149,4 +153,4 @@ const changePasswordSchema=Joi.object({
 //     })
 
 // })
-module.exports={registerSchema,verifyOtpSchema,changePasswordSchema,loginSchema,resetPasswordSchema,forgotPasswordSchema}
+module.exports={changeRoleSchema,registerSchema,verifyOtpSchema,changePasswordSchema,loginSchema,resetPasswordSchema,forgotPasswordSchema}

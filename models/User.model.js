@@ -165,7 +165,7 @@ userSchema.methods.generateRefreshToken=async function(){
        const token = jwt.sign(
           { id: this._id },
           process.env.REFRESH_TOKEN,
-          { expiresIn: '7d' }
+          { expiresIn: '30d' }
         )
         
         const hashedToken=await bcrypt.hash(token,10)
@@ -180,6 +180,9 @@ userSchema.methods.toJSON=function(){
        delete user.resetPasswordExpire
          delete user.resetPasswordToken
        delete user.tokens
+         delete user.__v
+         delete user.role
+
      return user
 }
 module.exports =

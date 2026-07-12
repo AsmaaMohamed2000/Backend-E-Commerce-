@@ -4,7 +4,7 @@ const validateSchemas=require('../validators/auth.validate')
 const authController = require('../controllers/auth.controller')
 const auth=require('../middlewares/authMiddleware')
 const upload=require('../middlewares/uploads')
-router.post('/register/send-otp',upload.single('avatar'),auth.validate(validateSchemas.registerSchema), authController.register)
+router.post('/register/send-otp',auth.validate(validateSchemas.registerSchema), authController.register)
 
 router.post('/verify-otp',auth.validate(validateSchemas.verifyOtpSchema) ,authController.verifyOtp)
 
@@ -19,5 +19,6 @@ router.get('/me',auth.auth ,authController.getMe)
 router.post('/forgot-password/send-otp',auth.validate(validateSchemas.forgotPasswordSchema) ,authController.forgotPassword)
 
 router.post('/reset-password/verify-otp',auth.validate(validateSchemas.resetPasswordSchema), authController.resetPassword)
+router.post('/change-role/:id',   auth.auth,  auth.adminOnly('admin'),auth.validate(validateSchemas.changeRoleSchema) ,authController.changeRole)
 
 module.exports = router

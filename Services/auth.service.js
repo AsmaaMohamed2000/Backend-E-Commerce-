@@ -1,315 +1,147 @@
+const User = require("../models/user.model");
+const Otp = require("../models/Otp.model");
+const bcrypt = require("bcryptjs");
+const crypto = require("crypto");
+const jwt=require('jsonwebtoken')
+const AppError = require("../errors/AppError");
 
-const User = require('../models/user.model')
-const Otp = require('../models/Otp.model')
-const mongoose=require('mongoose')
-const {sendOtp,sendURL} = require('../utilities/sendEmail')
-const uploadToCloudinary=require('../utilities/cloudinary')
-const bcrypt = require('bcryptjs')
-const jwt = require('jsonwebtoken')
-const crypto = require('crypto')
-// const console = require('console')
-// const { date } = require('joi')
+const { AUTH_ERRORS, AUTH_SUCCESS } = require("../constants/auth");
 
+const sendEmail = require("../utilities/sendEmail");
 
 const authService = {
+  register: async (data) => {
+    const { username, email, password, phone } = data;
 
-  register: async (data,avatarFile) => {
+  
+    const existingUser = await User.findOne({ email });
 
-  const { username, email, password, phone } = data;
-
-  const existingEmail = await User.findOne({ email });
-  if (existingEmail) {
-    throw new Error("User already exists");
-  }
-
-  const existingUsername = await User.findOne({ username });
-  if (existingUsername) {
-    throw new Error("Username already exists");
-  }
-     const otp = await Otp.findOne({
-      email,
-      type: 'verify-email'
-    }).sort({ createdAt: -1 })
-    if(otp&&otp.expiresAt>new Date()){
-  throw new Error("otp already sent check your email");
+    if (existingUser) {
+      throw new AppError(AUTH_ERRORS.USER_ALREADY_EXISTS, 409);
     }
+
+   
+    await Otp.deleteMany({
+      email,
+      type: "verify-email",
+    });
+
+   
+    const plainOtp = crypto.randomInt(100000, 1000000).toString();
+
+   
+    const hashedOtp = await bcrypt.hash(plainOtp, 10);
+
+    // Save OTP
+    await Otp.create({
+      email,
+      code: hashedOtp,
+      type: "verify-email",
+      expiresAt: Date.now() + 5 * 60 * 1000,
+      attempts: 0,
+      userData: {
+        username,
+        email,
+        password,
+        phone,
+      },
+    });
+
+    await sendEmail({email, username, otp:plainOtp,type:'otp',subject:"verify your Email"});
+
+    return {
+      success: true,
+      message: AUTH_SUCCESS.OTP_SENT,
+    };
+  },
+  verifyOtp: async (data) => {
+  const { email, code } = data;
+
+  const otp = await Otp.findOne({
+    email,
+    type: "verify-email",
+  }).sort({ createdAt: -1 });
+
+  if (!otp) {
+    throw new AppError(AUTH_ERRORS.INVALID_OTP, 400);
+  }
+
+  if (otp.expiresAt < Date.now()) {
+    await Otp.deleteMany({
+      email,
+      type: "verify-email",
+    });
+
+    throw new AppError(AUTH_ERRORS.INVALID_OTP, 400);
+  }
+
+  if (otp.attempts >= 3) {
+    throw new AppError(AUTH_ERRORS.OTP_ATTEMPTS_EXCEEDED, 429);
+  }
+
+  const validOtp = await bcrypt.compare(code, otp.code);
+
+  if (!validOtp) {
+    otp.attempts += 1;
+
+    await otp.save();
+
+    throw new AppError(AUTH_ERRORS.INVALID_OTP, 400);
+  }
+
+  const user = await User.create({
+    username: otp.userData.username,
+    email: otp.userData.email,
+    password: otp.userData.password,
+    phone: otp.userData.phone,
+    isVerified: true,
+  });
 
   await Otp.deleteMany({
     email,
     type: "verify-email",
   });
 
-  const plainOtp = crypto.randomInt(100000, 1000000).toString();
-  const hashedOtp = await bcrypt.hash(plainOtp, 10);
-let avatar={
-  url:'',
-  publicId:''
-}
- 
-if(avatarFile){
-  let uploaded
+  return {
+    success: true,
+    message: AUTH_SUCCESS.EMAIL_VERIFIED,
+    data: user,
+  };
+},
+login: async (data) => {
+  const { email, password } = data;
 
+  const user = await User.findOne({ email }).select("+password");
 
-   try{
-    uploaded = await uploadToCloudinary(
-        avatarFile.buffer,
-        "users"
-    );
-   
-   }catch(err){
-    console.log(err)
-   }
-    avatar = {
-        url: uploaded.secure_url,
-        publicId: uploaded.public_id
-    };
-   
-}
+  if (!user) {
+    throw new AppError(AUTH_ERRORS.INVALID_CREDENTIALS, 401);
+  }
 
-  await Otp.create({
-    email,
-    code: hashedOtp,
-    type: "verify-email",
-    expiresAt:  Date.now() + 5 * 60 * 1000,
-    userData: {
-      username,
-      email,
-      password,
-      phone,
-      avatar
-    },
-  });
+  if (!user.isVerified) {
+    throw new AppError(AUTH_ERRORS.EMAIL_NOT_VERIFIED, 403);
+  }
 
-  await sendOtp(email, username, plainOtp);
+  const validPassword = await user.comparePassword(password);
+
+  if (!validPassword) {
+    throw new AppError(AUTH_ERRORS.INVALID_CREDENTIALS, 401);
+  }
+
+  const accessToken = user.generateAccessToken();
+
+  const refreshToken = await user.generateRefreshToken();
 
   return {
     success: true,
-    message: "Verification code sent to your email",
+    message: AUTH_SUCCESS.LOGIN_SUCCESS,
+    accessToken,
+    refreshToken,
+    data: user,
   };
 },
-
-
-verifyOtp: async (data) => {
-
-    const { email, code } = data;
-
-        const otp = await Otp.findOne({
-            email,
-            type: "verify-email",
-            expiresAt: { $gt: Date.now() }
-        }).sort({ createdAt: -1 });
-
-        if (!otp) {
-            throw new Error("Invalid or expired OTP.");
-        }
-
-        
-        // if (otp.expiresAt < new Date()) {
-        //     await Otp.deleteMany(
-        //         {
-        //             email,
-        //             type: "verify-email"
-        //         }
-               
-        //     );
-
-        //     throw new Error("OTP expired.");
-        // }
-
-     
-        if (otp.attempts >= 5) {
-            throw new Error(
-                "Too many attempts. Please request a new OTP."
-            );
-        }
-
-       
-        const validOtp = await bcrypt.compare(
-            code,
-            otp.code
-        );
-
-        if (!validOtp) {
-
-            otp.attempts += 1;
-
-            await otp.save();
-
-            throw new Error("Invalid OTP.");
-        }
-
-     
-       
-      
-        const user = await User.create(
-            {
-                username: otp.userData.username,
-                email: otp.userData.email,
-                password: otp.userData.password,
-                phone: otp.userData.phone,
-                isVerified: true
-            },
-           
-        );
-
-       
-        await Otp.deleteMany(
-            {
-                email,
-                type: "verify-email"
-            }
-        );
-
-      
-
-        return {
-            success: true,
-            message: "Email verified successfully.",
-            user: user
-        };
-
-    
-
-},
-
-
-  login: async (data) => {
-    const { email, password} = data
- if (!email || !password) {
-  throw new Error('email and password require')
- }
- 
- const user = await User.findOne({ email }).select('+password')
-
-    if (!user) {
-      throw new Error('Invalid email or password')
-    }
- if (!user.isVerified) {
-      throw new Error('Please verify your email first')
-    }
-
-    const validPassword =await user.comparePassword(password)
-
-    if (!validPassword) {
-      throw new Error('Invalid email or password')
-    }
-
-    
-
-   
-    const access_token = await user.generateAccessToken()
-    const refresh_token=await user.generateRefreshToken()
-
-    return {
-      success: true,
-      message: 'Login successful',
-      access_token,
-      user,
-      refresh_token
-    }
-  },
-
-
-  forgotPassword: async (data) => {
-    const { email } = data
-
-    const user = await User.findOne({ email })
-
-    if (!user) {
-      throw new Error('User not found')
-    }
-
-    const token = crypto.randomBytes(32).toString('hex')
-
-    const hashToken = crypto.createHash('sha256').update(token).digest('hex')
-
-   user.resetPasswordToken=hashToken
-   user.resetPasswordExpire=Date.now()+5*60*1000
-await user.save({ validateBeforeSave: false })
-   const resetUrl=`${process.env.CLIENT_URL}/reset-password?token=${token}`
-try{
-   await sendOtp(email,resetUrl);
-}catch(err){
-    user.resetPasswordToken=null
-   user.resetPasswordExpire=null
-   await user.save()
-}
-    return {
-      success: true,
-      message: 'reset link sent to email',token
-    }
-  },
-
-
- resetPassword: async (data) => {
-
-    const { token, newPassword } = data;
-
-   
-    const hashedToken = crypto
-        .createHash("sha256")
-        .update(token)
-        .digest("hex");
-
-   
-    const user = await User.findOne({
-
-        resetPasswordToken: hashedToken,
-
-        resetPasswordExpire: {
-            $gt: Date.now()
-        }
-
-    }).select("+password");
-
-    if (!user) {
-
-        throw new Error(
-            "Invalid or expired reset link."
-        );
-
-    }
-
-  
-    const samePassword =
-        await user.comparePassword(newPassword);
-
-    if (samePassword) {
-
-        throw new Error(
-            "New password must be different from the current password."
-        );
-
-    }
-
-  
-    user.password = newPassword;
-
-   
-    user.resetPasswordToken = null;
-    user.resetPasswordExpire = null;
-
-   
-    user.passwordChangedAt = new Date();
-
-    await user.save();
-     const access_token = await user.generateAccessToken()
-    const refresh_token=await user.generateRefreshToken()
-
-    return {
-
-        success: true,
-access_token,
-refresh_token,
-        message:
-            "Password reset successfully."
-
-    };
-
-},
-regenerateAccessToken: async (token) => {
+refreshToken: async (token) => {
   if (!token) {
-    throw new Error("No refresh token");
+    throw new AppError(AUTH_ERRORS.NO_REFRESH_TOKEN, 401);
   }
 
   let decoded;
@@ -317,13 +149,13 @@ regenerateAccessToken: async (token) => {
   try {
     decoded = jwt.verify(token, process.env.REFRESH_TOKEN);
   } catch (error) {
-    throw new Error("Invalid or expired refresh token");
+    throw new AppError(AUTH_ERRORS.INVALID_REFRESH_TOKEN, 401);
   }
 
-  const user = await User.findById(decoded.id).select("+password");
+  const user = await User.findById(decoded.id);
 
   if (!user) {
-    throw new Error("User not found");
+    throw new AppError(AUTH_ERRORS.USER_NOT_FOUND, 404);
   }
 
   let matchedToken = null;
@@ -338,7 +170,7 @@ regenerateAccessToken: async (token) => {
   }
 
   if (!matchedToken) {
-    throw new Error("Invalid refresh token");
+    throw new AppError(AUTH_ERRORS.INVALID_REFRESH_TOKEN, 401);
   }
 
   user.tokens = user.tokens.filter(
@@ -347,74 +179,166 @@ regenerateAccessToken: async (token) => {
 
   await user.save();
 
-  const newAccessToken = user.generateAccessToken();
-
-  // هذه الدالة تضيف hash إلى user.tokens وتحفظ المستخدم تلقائيًا
-  const newRefreshToken = await user.generateRefreshToken();
+  const accessToken = user.generateAccessToken();
+  const refreshToken = await user.generateRefreshToken();
 
   return {
-    newAccessToken,
-    newRefreshToken,
-    user,
+    success: true,
+    accessToken,
+    refreshToken,
+    data: user,
+  }
+},
+logout: async (token) => {
+  if (!token) {
+    throw new AppError(AUTH_ERRORS.NO_REFRESH_TOKEN, 401);
+  }
+
+  let decoded;
+
+  try {
+    decoded = jwt.verify(token, process.env.REFRESH_TOKEN);
+  } catch (error) {
+    throw new AppError(AUTH_ERRORS.INVALID_REFRESH_TOKEN, 401);
+  }
+
+  const user = await User.findById(decoded.id);
+
+  if (!user) {
+    throw new AppError(AUTH_ERRORS.USER_NOT_FOUND, 404);
+  }
+
+  let matchedToken = null;
+
+  for (const item of user.tokens) {
+    const isMatch = await bcrypt.compare(token, item.token);
+
+    if (isMatch) {
+      matchedToken = item;
+      break;
+    }
+  }
+
+  if (!matchedToken) {
+    throw new AppError(AUTH_ERRORS.INVALID_REFRESH_TOKEN, 401);
+  }
+
+  user.tokens = user.tokens.filter(
+    (item) => item._id.toString() !== matchedToken._id.toString()
+  );
+
+  await user.save();
+
+  return {
+    success: true,
+    message: AUTH_SUCCESS.LOGOUT_SUCCESS,
   };
 },
-logout:async(token)=>{
+forgotPassword: async (data) => {
+  const { email } = data;
 
-   if(!token){
+  const user = await User.findOne({ email });
 
-      throw new Error('No refresh token')
-   }
-let decoded
- try{
-    decoded = jwt.verify(
-      token,
-      process.env.REFRESH_TOKEN
-   )
- }catch(err){
-  throw new Error('refresh token expired')
- }
+  if (!user) {
+    throw new AppError(AUTH_ERRORS.USER_NOT_FOUND, 404);
+  }
 
-   const user = await User.findById(decoded.id)
+  const resetToken = crypto.randomBytes(32).toString("hex");
 
-   if(!user){
+  const hashedToken = crypto
+    .createHash("sha256")
+    .update(resetToken)
+    .digest("hex");
 
-      throw new Error('User not found')
-   }
+  user.resetPasswordToken = hashedToken;
+  user.resetPasswordExpire = Date.now() + 10 * 60 * 1000;
 
-   let matchedToken = null
+  await user.save({ validateBeforeSave: false });
 
+  const resetLink = `${process.env.CLIENT_URL}/reset-password/${resetToken}`;
 
-   for(const item of user.tokens){
+  await sendEmail({
+    email: user.email,
+   resetUrl:resetLink,
+   subject:'Reset Password',
+   type:'reset-password'
+   });
 
-      const isMatch = await bcrypt.compare(
-         token,
-         item.token
-      )
-
-      if(isMatch){
-        matchedToken=item
-
-       
-         break
-      }
-   }
-
-   if(!matchedToken){
-
-      throw new Error('Invalid refresh token')
-   }
-   user.tokens=user.tokens.filter((item)=>(
-      item._id.toString()!==matchedToken._id.toString()
-    ))
-  
-    await user.save()
-
-
-   return {success:true}
-
+  return {
+    success: true,
+    message: AUTH_SUCCESS.PASSWORD_RESET_LINK_SENT,resetToken
+  };
 },
 
+ 
+resetPassword: async (data) => {
+  const {token, newPassword } = data;
 
+  const hashedToken = crypto
+    .createHash("sha256")
+    .update(token)
+    .digest("hex");
+
+  const user = await User.findOne({
+    resetPasswordToken: hashedToken,
+    resetPasswordExpire: { $gt: Date.now() },
+  }).select("+password");
+
+  if (!user) {
+    throw new AppError(AUTH_ERRORS.INVALID_RESET_TOKEN, 400);
+  }
+
+  const isSamePassword = await user.comparePassword(newPassword);
+
+  if (isSamePassword) {
+    throw new AppError(AUTH_ERRORS.SAME_PASSWORD, 400);
+  }
+
+  user.password = newPassword;
+  user.resetPasswordToken = undefined;
+  user.resetPasswordExpire = undefined;
+
+  await user.save();
+
+  return {
+    success: true,
+    message: AUTH_SUCCESS.PASSWORD_RESET_SUCCESS,
+  };
+},
+changeRole: async (userId, role, currentUserId) => {
+  const user = await User.findById(userId);
+
+  if (!user) {
+    throw new AppError(AUTH_ERRORS.USER_NOT_FOUND, 404);
+  }
+
+  if (user._id.toString() === currentUserId.toString()) {
+    throw new AppError(AUTH_ERRORS.USER_CANNOT_CHANGE_OWN_ROLE, 400);
+  }
+
+  user.role = role;
+
+  await user.save();
+
+  return {
+    success: true,
+    message: AUTH_SUCCESS.ROLE_UPDATED,
+    data: user,
+  };
+},
+getMe: async (userId) => {
+  const user = await User.findById(userId);
+
+  if (!user) {
+    throw new AppError(AUTH_ERRORS.USER_NOT_FOUND, 404);
+  }
+
+  return {
+    success: true,
+    data: user,
+  };
+},
 }
-
 module.exports = authService
+
+
