@@ -81,7 +81,7 @@ const productService = {
     const product = await Product.create({
 
         name,
-        shortDescription,
+        shortDescription,///
         description,
         price,
         discountPrice,

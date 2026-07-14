@@ -58,7 +58,20 @@ const USER_SUCCESS = {
   USER_DELETED: "User deleted successfully",
   PASSWORD_CHANGED: "Password changed successfully",
 };
+const ORDER_ERRORS = {
+    ORDER_NOT_FOUND: "Order not found.",
+    ORDER_ALREADY_CANCELLED: "Order is already cancelled.",
+    ORDER_CANNOT_BE_CANCELLED: "Order cannot be cancelled.",
+    CART_IS_EMPTY: "Your cart is empty.",
+    CART_NOT_FOUND: "Cart not found.",
+    INVALID_ORDER_STATUS: "Invalid order status.",
+    ORDER_ACCESS_DENIED: "You are not authorized to access this order.",
+    PRODUCT_NOT_AVAILABLE: "One or more products are no longer available.",
+    PRODUCT_INACTIVE: "One or more products are inactive.",
+    PAYMENT_ALREADY_COMPLETED: "Order has already been paid."
+};
 
+;
 
-module.exports = { USER_ERRORS,
+module.exports = { USER_ERRORS,ORDER_ERRORS,
   USER_SUCCESS, PRODUCT_ERRORS ,CART_ERRORS,WISHLIST_ERRORS};

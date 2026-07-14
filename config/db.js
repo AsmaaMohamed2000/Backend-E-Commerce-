@@ -15,11 +15,11 @@ module.exports=async()=>{
 // {
 //     "email":"asmaamohamedali56@gmail.com",
 //     {
-//  "currentPassword" : "aaAA23@#",
-//   "newPassword": "aaAA23@#a"
+// {
+//     "newPassword":"aaAA@@22"
 
-//eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjZhNDkyN2Q1MTJkYWMxYmJjYzQ2NWQ0YyIsInJvbGUiOiJhZG1pbiIsImlhdCI6MTc4MzM0MDQ5NCwiZXhwIjoxNzg1OTMyNDk0fQ.m_K_YzhpNEJq1ImZh38-doo45NwuRGVtzPvMyZ41YJc
 
+//eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjZhNTMwZWE3ZmUzNGRiN2U4MTA3Njk3MiIsInJvbGUiOiJhZG1pbiIsImlhdCI6MTc4Mzg3MTQ5NiwiZXhwIjoxNzg2NDYzNDk2fQ.Lc0TCoTj3Cj7jK8Ivs3t3uqA9htHES_B80hkMPpYMpQ
 //admin
 //eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjZhNTMwZWE3ZmUzNGRiN2U4MTA3Njk3MiIsInJvbGUiOiJjdXN0b21lciIsImlhdCI6MTc4MzgyODE4MSwiZXhwIjoxNzg2NDIwMTgxfQ.rmUONZGK8P7DTTx56JqYEA31coOw6yOhEL140nGlLpU
-// "password":"aaAA@@32",
+// "password":"aaAA@@32"

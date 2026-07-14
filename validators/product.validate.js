@@ -68,7 +68,7 @@ const updateProductSchema = Joi.object({
     Joi.array().items(Joi.string()),
     Joi.string()
   )
-}).min(1);
+});
 
 
 // Add Review

@@ -308,7 +308,7 @@ const authController = {
       const result = await authService.changeRole(
         req.params.id,
         req.body.role,
-        req.user
+        req.user._id
       );
 
       res.status(200).json(result);

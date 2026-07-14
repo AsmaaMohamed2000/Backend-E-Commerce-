@@ -9,6 +9,8 @@ const userRoutes=require('./routes/user.route')
 const productRoutes=require('./routes/product.route')
 const cartRoutes=require('./routes/cart.route')
 const wishlistRoutes=require('./routes/wishlist.routes')
+const orderRoutes=require('./routes/order.route')
+const webhook=require('./routes/webhook.route')
 const errMiddleware=require('./middlewares/error.middleware')
 const cors=require('cors')
 const connectDB=require('./config/db')
@@ -33,7 +35,7 @@ app.use(cors({
   methods: ["GET", "POST", "PUT","PATCH", "DELETE", "OPTIONS"],
   allowedHeaders: ["Content-Type", "Authorization"]
 }));
-
+app.use('/api/stripe',webhook)
 
 app.use(express.json())
 app.use(cookieParser())
@@ -46,6 +48,7 @@ app.use('/api/users',userRoutes)
 app.use('/api/products',productRoutes)
 app.use('/api/cart',cartRoutes)
 app.use('/api/wishlist',wishlistRoutes)
+app.use('/api/orders',orderRoutes)
 app.use(errMiddleware)
 app.listen(PORT,()=>{
     console.log(`server running on port ${PORT}`)
