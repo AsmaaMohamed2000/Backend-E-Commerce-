@@ -248,7 +248,7 @@ const authController = {
       res.status(200).json({
         success: true,
         accessToken: result.accessToken,
-        user: result.user,
+        user: result.data,
       });
     } catch (error) {
       next(error);

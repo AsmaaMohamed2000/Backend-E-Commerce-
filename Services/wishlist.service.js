@@ -10,7 +10,7 @@ const wishlistService = {
 
         let wishlist = await Wishlist.findOne({
             user: userId
-        });
+        }).lean();
 
         if (!wishlist) {
 

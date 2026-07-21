@@ -3,6 +3,7 @@ const Product = require("../models/product.model");
 const AppError = require("../errors/AppError");
 const validateObjectId = require("../utilities/validateObjectId");
 const COUPONS = require("../constants/coupons")
+const getFinalPrice=require('../utilities/getFinalPrice')
 const { CART_ERRORS, PRODUCT_ERRORS } = require("../constants/errors");
 const cartService = {
   getCart: async (userId) => {
@@ -20,6 +21,12 @@ const cartService = {
   addItem: async (userId, productId, quantity = 1) => {
 
     validateObjectId(productId);
+    if (!Number.isInteger(quantity) || quantity < 1) {
+    throw new AppError(
+        CART_ERRORS.INVALID_QUANTITY,
+        400
+    );
+}
 
     const product = await Product.findById(productId);
 
@@ -30,19 +37,6 @@ const cartService = {
         );
     }
 
-    // if (!product.isActive) {
-    //     throw new AppError(
-    //         PRODUCT_ERRORS.NOT_FOUND,
-    //         404
-    //     );
-    // }
-
-    if (product.stock < quantity) {
-        throw new AppError(
-            CART_ERRORS.INSUFFICIENT_STOCK,
-            400
-        );
-    }
 
     let cart = await Cart.findOne({
         user: userId
@@ -58,56 +52,59 @@ const cartService = {
     }
 
     const cartItem = cart.items.find(
-        item => item.product.toString() === productId
+        item => item.product.toString() === productId.toString()
     );
 
-    if (cartItem) {
+  if (cartItem) {
 
-        if (
-            product.stock <
-            quantity 
-        ) {
-            throw new AppError(
-                CART_ERRORS.INSUFFICIENT_STOCK,
-                400
-            );
-        }
+    const newQuantity = cartItem.quantity + quantity;
 
-        cartItem.quantity += quantity;
-
-    } else {
-
-        cart.items.push({
-
-            product: product._id,
-
-            name: product.name,
-
-            image: product.images[0]?.url,
-
-            price:
-                product.discountPrice > 0
-                    ? product.discountPrice
-                    : product.price,
-
-            quantity
-
-        });
-
+    if (newQuantity > product.stock) {
+        throw new AppError(
+            CART_ERRORS.INSUFFICIENT_STOCK,
+            400
+        );
     }
 
-    product.stock -= quantity;
+    cartItem.quantity = newQuantity
+    cartItem.price=getFinalPrice(product)
 
-    await product.save();
+} 
+else {
+
+    if (quantity > product.stock) {
+        throw new AppError(
+            CART_ERRORS.INSUFFICIENT_STOCK,
+            400
+        );
+    }
+
+    cart.items.push({
+        product: product._id,
+        name: product.name,
+        image: product.images[0]?.url ,
+        price: getFinalPrice(product),
+        quantity
+    });
+
+}
+
+
 
     await cart.save();
 
-    return {cart,product};
+    return {cart};
 
 },
 updateQuantity: async (userId, productId, quantity) => {
 
     validateObjectId(productId);
+        if (!Number.isInteger(quantity) || quantity < 1) {
+    throw new AppError(
+        CART_ERRORS.INVALID_QUANTITY,
+        400
+    );
+}
 
     const product = await Product.findById(productId);
 
@@ -130,7 +127,7 @@ updateQuantity: async (userId, productId, quantity) => {
     }
 
     const cartItem = cart.items.find(
-        item => item.product.toString() === productId
+        item => item.product.toString() === productId.toString()
     );
 
     if (!cartItem) {
@@ -139,34 +136,20 @@ updateQuantity: async (userId, productId, quantity) => {
             404
         );
     }
-
-    const difference = quantity - cartItem.quantity;
-
-    if (difference > 0) {
-
-        if (product.stock < difference) {
-            throw new AppError(
-                CART_ERRORS.QUANTITY_EXCEEDS_STOCK,
-                400
-            );
-        }
-
-        product.stock -= difference;
-
-    } else if (difference < 0) {
-
-        product.stock += Math.abs(difference);
-
+   if (product.stock < quantity) {
+        throw new AppError(
+            CART_ERRORS.INSUFFICIENT_STOCK,
+            400
+        );
     }
+  
 
     cartItem.quantity = quantity;
+     cartItem.price=getFinalPrice(product)
 
-    await Promise.all([
-        product.save(),
-        cart.save()
-    ]);
-
-    return {cart,product};
+  
+await  cart.save()
+    return {cart};
 
 },
 removeItem: async (userId, productId) => {
@@ -185,7 +168,7 @@ removeItem: async (userId, productId) => {
     }
 
     const itemIndex = cart.items.findIndex(
-        item => item.product.toString() === productId
+        item => item.product.toString() === productId.toString()
     );
 
     if (itemIndex === -1) {
@@ -195,16 +178,7 @@ removeItem: async (userId, productId) => {
         );
     }
 
-    const cartItem = cart.items[itemIndex];
 
-    const product =await Product.findByIdAndUpdate(
-        productId,
-        {
-            $inc: {
-                stock: cartItem.quantity
-            }
-        }
-    );
 
     cart.items.splice(itemIndex, 1);
 
@@ -217,7 +191,7 @@ applyCoupon: async (userId, code) => {
 
     const cart = await Cart.findOne({
         user: userId
-    });
+    })
 
     if (!cart) {
         throw new AppError(
@@ -239,8 +213,15 @@ applyCoupon: async (userId, code) => {
             400
         );
     }
+    if (!code || typeof code !== "string") {
+    throw new AppError(
+        CART_ERRORS.INVALID_COUPON,
+        400
+    );
+}
+const convertedCode=code.toUpperCase()
 
-    const coupon = COUPONS[code];
+    const coupon = COUPONS[convertedCode];
 
     if (!coupon) {
         throw new AppError(
@@ -250,7 +231,7 @@ applyCoupon: async (userId, code) => {
     }
 
     cart.coupon = {
-        code,
+        code:convertedCode,
         discountType: coupon.discountType,
         discountValue: coupon.discountValue
     };
@@ -307,18 +288,7 @@ clearCart: async (userId) => {
         );
     }
 
-  await Promise.all(
-    cart.items.map(item =>
-        Product.findByIdAndUpdate(
-            item.product,
-            {
-                $inc: {
-                    stock: item.quantity
-                }
-            }
-        )
-    )
-);
+
 
     cart.items = [];
 

@@ -1,9 +1,10 @@
 const Product = require("../models/product.model");
+const Order = require("../models/order.model.js");
 const cloudinary = require("../config/cloudinary");
 const uploadCloudinary = require("../utilities/cloudinary");
 const mongoose=require('mongoose')
 const AppError=require('../errors/AppError')
-const {PRODUCT_ERRORS}=require('../constants/errors')
+const {PRODUCT_ERRORS, ORDER_ERRORS}=require('../constants/errors')
 const validateObjectId=require('../utilities/validateObjectId')
 const productFilter=require('../utilities/productFilter')
 const sortProducts=require('../utilities/sort.js')
@@ -22,11 +23,10 @@ const productService = {
         category,
         subcategory,
         brand,
-        tags,
         featured,
         isActive
     } = req.body;
-
+let tags = req.body.tags;
     if (!req.files || req.files.length === 0) {
         throw new AppError(PRODUCT_ERRORS.IMAGE_REQUIRED, 400);
     }
@@ -51,7 +51,23 @@ const productService = {
         }
     }
 
+
+if (typeof tags === "string") {
+    try {
+        tags = JSON.parse(tags);
+    } catch {
+        tags = tags
+            .split(",")
+            .map(tag => tag.trim())
+            .filter(Boolean);
+    }
+}
+
+if (Array.isArray(tags)) {
+    tags = tags.map(tag => tag.trim().toLowerCase());
+}
     const images = [];
+    let product
 
     try {
 
@@ -68,17 +84,7 @@ const productService = {
             });
 
         }
-
-    } catch (err) {
-
-        for (const img of images) {
-            await cloudinary.uploader.destroy(img.public_id);
-        }
-
-        throw err;
-    }
-
-    const product = await Product.create({
+           product = await Product.create({
 
         name,
         shortDescription,///
@@ -98,26 +104,39 @@ const productService = {
 
     });
 
+    } catch (err) {
+
+        for (const img of images) {
+            await cloudinary.uploader.destroy(img.public_id);
+        }
+
+        throw err;
+    }
+
+  
+
     return product;
 
 },
 getProducts: async (req) => {
 
-    const page = Number(req.query.page) || 1;
-    const limit = Number(req.query.limit) || 6;
+    const page = Math.max(Number(req.query.page) || 1,1);
+    const limit = Math.min(Math.max(Number(req.query.limit) || 10,1),100);
     const skip = (page - 1) * limit;
 
     const filter = productFilter(req.query);
       const  sort =sortProducts(req.query.sort)
   
-    const totalProducts = await Product.countDocuments(filter);
+  const [totalProducts, products] = await Promise.all([
+    Product.countDocuments(filter),
 
-    const products = await Product.find(filter)
+    Product.find(filter)
         .select("-reviews")
-        .populate("createdBy", "username email")
         .sort(sort)
         .skip(skip)
-        .limit(limit);
+        .limit(limit)
+        .lean()
+]);
 
     return {
 
@@ -142,7 +161,7 @@ getProduct: async (req) => {
         _id:id,
         isActive:true
     }).populate('reviews.user','username avatar')
-        .populate("createdBy", "username email");
+      
 
     if (!product) {
         throw new AppError(PRODUCT_ERRORS. NOT_FOUND,404);
@@ -263,14 +282,19 @@ updateProduct: async (req) => {
 
         // Delete old images after upload succeeds
         for (const publicId of deletedImages) {
-
-            await cloudinary.uploader.destroy(publicId);
+               if(product.images.some(img=>img.public_id===publicId))
+         {
+                await cloudinary.uploader.destroy(publicId);
 
             product.images = product.images.filter(
                 image => image.public_id !== publicId
             );
-
+         }
         }
+
+         
+    
+        
 
     } catch (error) {
 
@@ -310,144 +334,15 @@ deleteProduct: async (req) => {
         );
     }
 
-    try {
-
-        for (const image of product.images) {
-            await cloudinary.uploader.destroy(image.public_id);
-        }
-
-        await product.deleteOne();
-
-    } catch (error) {
-        throw error;
-    }
-
+  
+product.isActive=false
+await product.save()
     return {
         message: "Product deleted successfully"
     };
 
 },
-// searchProducts: async (req) => {
 
-//   const {
-//         keyword,
-//         category,
-//         subcategory,
-//         brand,
-//         tag,
-//         minPrice,
-//         maxPrice,
-//         sort
-//     } = req.query;
-
-//     const page = Number(req.query.page) || 1;
-//     const limit = Number(req.query.limit) || 10;
-//     const skip = (page - 1) * limit;
-
-//     const filter = {
-//         isActive: true
-//     };
-
-//     if (keyword) {
-//         filter.$text = {
-//             $search: keyword
-//         };
-//     }
-
-//     if (category) {
-//         filter.category = category.toLowerCase();
-//     }
-
-//     if (subcategory) {
-//         filter.subcategory = subcategory;
-//     }
-
-//     if (brand) {
-//         filter.brand = brand;
-//     }
-
-//     if (tag) {
-//         filter.tags ={
-//             $in:tag.split(',')
-//         }
-//     }
-
-//     if (minPrice || maxPrice) {
-
-//         filter.price = {};
-
-//         if (minPrice) {
-//             filter.price.$gte = Number(minPrice);
-//         }
-
-//         if (maxPrice) {
-//             filter.price.$lte = Number(maxPrice);
-//         }
-
-//     }
-
-//     let sortOption = {
-//         createdAt: -1
-//     };
-
-//     switch (sort) {
-
-//         case "priceAsc":
-//             sortOption = {
-//                 price: 1
-//             };
-//             break;
-
-//         case "priceDesc":
-//             sortOption = {
-//                 price: -1
-//             };
-//             break;
-
-//         case "rating":
-//             sortOption = {
-//                 averageRating: -1
-//             };
-//             break;
-
-//         case "name":
-//             sortOption = {
-//                 name: 1
-//             };
-//             break;
-
-//     }
-
-//     const totalProducts =
-//         await Product.countDocuments(filter);
-
-//     const products = await Product.find(filter)
-//         .select("-reviews")
-//         .populate(
-//             "createdBy",
-//             "username email"
-//         )
-//         .sort(sortOption)
-//         .skip(skip)
-//         .limit(limit);
-
-//     return {
-
-//         page,
-
-//         limit,
-
-//         totalProducts,
-
-//         totalPages: Math.ceil(
-//             totalProducts / limit
-//         ),
-
-//         products
-
-//     };
-
-// },
 
 addReview: async (req) => {
 
@@ -467,7 +362,12 @@ addReview: async (req) => {
             404
         );
     }
-
+const bought=await Order.findOne({
+    user:req.user.id,
+    status:"delivered",
+   'items.product':product._id
+})
+if(!bought) throw new AppError(PRODUCT_ERRORS. REVIEW_PURCHASE,400)
     const alreadyReviewed = product.reviews.some(
         review => review.user.toString() === req.user.id
     );
@@ -481,7 +381,7 @@ addReview: async (req) => {
 
     product.reviews.push({
         user: req.user.id,
-        rating,
+        rating:Number(rating),
         comment
     });
 
@@ -549,7 +449,7 @@ deleteReview: async (req) => {
     }
 
     const isOwner =
-        review.user.toString() === req.user.id;
+        review.user.toString() === req.user.id.toString();
 
     const isAdmin =
         req.user.role === "admin";

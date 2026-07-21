@@ -9,7 +9,7 @@ USER_CANNOT_CHANGE_OWN_ROLE:'user can not change own role',
 
   OTP_ALREADY_SENT:
     "OTP already sent. Please check your email.",
-
+OTP_ALREADY_SENT: "OTP already sent. Please check your email.",
   INVALID_OTP:
     "Invalid or expired OTP.",
 

@@ -1,12 +1,13 @@
 
-const filter=(query,userId=null)=>{
+const filter=(query)=>{
 const filtered = {
     };
-    if(userId){
-        filtered.user=userId
-    }
+
    const {user,status,paymentStatus,paymentMethod,search,fromDate,toDate} =query
-  if (user) {
+    //   if(userId){
+    //     filtered.user=userId
+    // }
+     if (user) {
         filtered.user = user;
     }
     if (status) {
@@ -91,3 +92,4 @@ const sortedOrder=(query)=>{
     return sortOption
 }
 module.exports={filter,sortedOrder}
+//http://localhost:4000/api/orders/my?status=pending&paymentStatus=pending&paymentMethod=stripe&search=asm&fromDate=2026-07-4&toDate=2026-07-15

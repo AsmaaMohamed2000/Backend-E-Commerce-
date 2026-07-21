@@ -57,12 +57,22 @@
 const transporter = require("../config/email.config");
 
 const sendEmail = async ({
-  email,
+ email,
   subject,
   username,
   otp,
   resetUrl,
   type,
+  orderId,
+  items,
+  subtotal,
+  shippingFee,
+  tax,
+  discount,
+  totalPrice,
+  paymentMethod,
+  adminNote,
+  status
 }) => {
   let html = "";
 
@@ -101,6 +111,89 @@ const sendEmail = async ({
 
     <p>This link expires in 10 minutes.</p>
   `;
+}
+if (type === "order-confirmation") {
+
+  const rows = items.map(item => `
+      <tr>
+          <td>${item.name}</td>
+          <td>${item.quantity}</td>
+          <td>${item.price} EGP</td>
+          <td>${item.price * item.quantity} EGP</td>
+      </tr>
+  `).join("");
+
+  html = `
+    <div style="font-family:Arial,sans-serif">
+
+      <h2>Order Confirmation</h2>
+
+      <p>Hello <strong>${username}</strong>,</p>
+
+      <p>Thank you for your order. Your order has been placed successfully.</p>
+
+      <p><strong>Order ID:</strong> ${orderId}</p>
+
+      <table
+        border="1"
+        cellpadding="10"
+        cellspacing="0"
+        style="border-collapse:collapse;width:100%;text-align:center"
+      >
+        <thead>
+          <tr>
+            <th>Product</th>
+            <th>Quantity</th>
+            <th>Unit Price</th>
+            <th>Total</th>
+          </tr>
+        </thead>
+
+        <tbody>
+          ${rows}
+        </tbody>
+
+      </table>
+
+      <br>
+
+      <p><strong>Subtotal:</strong> ${subtotal} EGP</p>
+
+      <p><strong>Shipping:</strong> ${shippingFee} EGP</p>
+
+      <p><strong>Tax:</strong> ${tax} EGP</p>
+
+      <p><strong>Discount:</strong> ${discount} EGP</p>
+
+      <h3>Total: ${totalPrice} EGP</h3>
+
+      <p><strong>Payment Method:</strong> ${paymentMethod}</p>
+
+      <hr>
+
+      <p>Thank you for shopping with Ecommerce </p>
+
+    </div>
+  `;
+}
+if (type === "order-status") {
+  html = `
+    <h2>Order Status Updated</h2>
+
+    <p>Hello ${username},</p>
+
+    <p>Your order <strong>${orderId}</strong> has been updated.</p>
+
+    <p><strong>Current Status:</strong> ${status}</p>
+
+    ${
+      adminNote
+        ? `<p><strong>Admin Note:</strong> ${adminNote}</p>`
+        : ""
+    }
+
+    <p>Thank you for shopping with Ecommerce </p>
+  `
 }
 
   await transporter.sendMail({

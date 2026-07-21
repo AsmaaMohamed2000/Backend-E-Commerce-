@@ -23,8 +23,9 @@ const wishlistSchema = new mongoose.Schema(
 wishlistSchema.pre(/^find/, function () {
   this.populate({
     path: "products",
+    match:{isActive:true},
     select:
-      "name slug shortDescription price discountPrice images averageRating numReviews stock isActive brand",
+      "name slug shortDescription price discountPrice images averageRating numReviews stock  brand",
   });
 
   // next();

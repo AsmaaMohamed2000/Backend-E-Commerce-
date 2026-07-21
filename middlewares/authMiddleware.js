@@ -30,7 +30,34 @@ const validate = (schema) => {
   }
 }
 
+const ValidateQuery= (schema) => {
 
+  return (req,res,next)=>{
+
+    const { error, value } =
+      schema.validate({...req.query},{
+        abortEarly:false,
+        stripUnknown:true,convert:true
+      })
+
+    if(error){
+
+      return res.status(400).json({
+        success:false,
+        type:'validation',
+        message:'validation failed',
+        errors:error.details.map((err)=> (
+          {message:err.message,field:err.path[0]}
+        )
+        )
+      })
+    }
+console.log(value)
+    req.validateQuery = value
+console.log(req.validateQuery )
+    next()
+  }
+}
 
 const auth = async (req, res, next) => {
  
@@ -75,4 +102,4 @@ adminOnly= (...roles) => {
     }
     next();
   }};
-module.exports = {validate,auth,adminOnly}
+module.exports = {validate,auth,adminOnly,ValidateQuery}

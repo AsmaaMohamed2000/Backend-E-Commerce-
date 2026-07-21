@@ -13,15 +13,15 @@ const userController = {
 
   getAllUsers: async (req, res, next) => {
     try {
-      const result = await userService.getAllUsers({
-        page: Number(req.query.page) || 1,
-        limit: Number(req.query.limit) || 10,
-        search: req.query.search || "",
-        sort: req.query.sort || "-createdAt",
-        role: req.query.role,
-        isVerified: req.query.isVerified,
-      });
-
+        // page,
+        // limit,
+        // search: req.query.search || "",
+        // sort: req.query.sort || "-createdAt",
+        // role: req.query.role,
+        // isVerified: req.query.isVerified,
+      // const page = Math.max(Number(req.query.page) || 1, 1);
+      // const limit = Math.min(Math.max(Number(req.query.limit) || 10, 1), 20);
+       const result = await userService.getAllUsers(req.validateQuery );
       res.status(200).json(result);
     } catch (error) {
       next(error);
@@ -38,15 +38,7 @@ const userController = {
     }
   },
 
-  getMe: async (req, res, next) => {
-    try {
-      const result = await userService.getMe(req.user.id);
-
-      res.status(200).json(result);
-    } catch (error) {
-      next(error);
-    }
-  },
+  
 
   updateUser: async (req, res, next) => {
     try {
@@ -54,7 +46,7 @@ const userController = {
         req.params.id,
         req.user,
         req.body,
-        req.file
+        req.file,
       );
 
       res.status(200).json(result);
@@ -65,10 +57,7 @@ const userController = {
 
   changePassword: async (req, res, next) => {
     try {
-      const result = await userService.changePassword(
-        req.user.id,
-        req.body
-      );
+      const result = await userService.changePassword(req.user.id, req.body);
 
       res.status(200).json(result);
     } catch (error) {
@@ -78,7 +67,7 @@ const userController = {
 
   deleteUser: async (req, res, next) => {
     try {
-      const result = await userService.deleteUser(req.params.id);
+      const result = await userService.deleteUser(req.params.id,req.user);
 
       res.status(200).json(result);
     } catch (error) {

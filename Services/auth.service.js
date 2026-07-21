@@ -21,11 +21,15 @@ const authService = {
     }
 
    
-    await Otp.deleteMany({
-      email,
-      type: "verify-email",
-    });
+  const existingOtp = await Otp.findOne({
+  email,
+  type: "verify-email",
+  expiresAt: { $gt: Date.now() },
+});
 
+if (existingOtp) {
+  throw new AppError(AUTH_ERRORS.OTP_ALREADY_SENT, 400);
+}
    
     const plainOtp = crypto.randomInt(100000, 1000000).toString();
 
@@ -57,23 +61,18 @@ const authService = {
   verifyOtp: async (data) => {
   const { email, code } = data;
 
-  const otp = await Otp.findOne({
+const otp = await Otp.findOne({
     email,
-    type: "verify-email",
-  }).sort({ createdAt: -1 });
+    type:"verify-email",
+    expiresAt:{
+        $gt:Date.now()
+    }
+});
 
   if (!otp) {
     throw new AppError(AUTH_ERRORS.INVALID_OTP, 400);
   }
 
-  if (otp.expiresAt < Date.now()) {
-    await Otp.deleteMany({
-      email,
-      type: "verify-email",
-    });
-
-    throw new AppError(AUTH_ERRORS.INVALID_OTP, 400);
-  }
 
   if (otp.attempts >= 3) {
     throw new AppError(AUTH_ERRORS.OTP_ATTEMPTS_EXCEEDED, 429);
@@ -139,6 +138,76 @@ login: async (data) => {
     data: user,
   };
 },
+forgotPassword: async (data) => {
+  const { email } = data;
+
+  const user = await User.findOne({ email });
+
+  if (!user) {
+    return {
+    success: true,
+    message: AUTH_SUCCESS.PASSWORD_RESET_LINK_SENT
+  };
+  }
+
+  const resetToken = crypto.randomBytes(32).toString("hex");
+
+  const hashedToken = crypto
+    .createHash("sha256")
+    .update(resetToken)
+    .digest("hex");
+
+  user.resetPasswordToken = hashedToken;
+  user.resetPasswordExpire = Date.now() + 10 * 60 * 1000;
+
+  await user.save({ validateBeforeSave: false });
+
+  const resetLink = `${process.env.CLIENT_URL}/reset-password/${resetToken}`;
+
+  await sendEmail({
+    email: user.email,
+   resetUrl:resetLink,
+   subject:'Reset Password',
+   type:'reset-password'
+   });
+
+  return {
+    success: true,
+    message: AUTH_SUCCESS.PASSWORD_RESET_LINK_SENT,resetToken
+  };
+},
+
+ 
+resetPassword: async (data) => {
+  const {token, newPassword } = data;
+
+  const hashedToken = crypto
+    .createHash("sha256")
+    .update(token)
+    .digest("hex");
+
+  const user = await User.findOne({
+    resetPasswordToken: hashedToken,
+    resetPasswordExpire: { $gt: Date.now() },
+  }).select("+password");
+
+  if (!user) {
+    throw new AppError(AUTH_ERRORS.INVALID_RESET_TOKEN, 400);
+  }
+
+  
+
+  user.password = newPassword;
+  user.resetPasswordToken = undefined;
+  user.resetPasswordExpire = undefined;
+
+  await user.save();
+
+  return {
+    success: true,
+    message: AUTH_SUCCESS.PASSWORD_RESET_SUCCESS,
+  };
+},
 refreshToken: async (token) => {
   if (!token) {
     throw new AppError(AUTH_ERRORS.NO_REFRESH_TOKEN, 401);
@@ -151,7 +220,9 @@ refreshToken: async (token) => {
   } catch (error) {
     throw new AppError(AUTH_ERRORS.INVALID_REFRESH_TOKEN, 401);
   }
-
+if(decoded.type !== "refresh_token"){
+    throw new AppError(AUTH_ERRORS.INVALID_REFRESH_TOKEN,401);
+}
   const user = await User.findById(decoded.id);
 
   if (!user) {
@@ -234,77 +305,7 @@ logout: async (token) => {
     message: AUTH_SUCCESS.LOGOUT_SUCCESS,
   };
 },
-forgotPassword: async (data) => {
-  const { email } = data;
 
-  const user = await User.findOne({ email });
-
-  if (!user) {
-    throw new AppError(AUTH_ERRORS.USER_NOT_FOUND, 404);
-  }
-
-  const resetToken = crypto.randomBytes(32).toString("hex");
-
-  const hashedToken = crypto
-    .createHash("sha256")
-    .update(resetToken)
-    .digest("hex");
-
-  user.resetPasswordToken = hashedToken;
-  user.resetPasswordExpire = Date.now() + 10 * 60 * 1000;
-
-  await user.save({ validateBeforeSave: false });
-
-  const resetLink = `${process.env.CLIENT_URL}/reset-password/${resetToken}`;
-
-  await sendEmail({
-    email: user.email,
-   resetUrl:resetLink,
-   subject:'Reset Password',
-   type:'reset-password'
-   });
-
-  return {
-    success: true,
-    message: AUTH_SUCCESS.PASSWORD_RESET_LINK_SENT,resetToken
-  };
-},
-
- 
-resetPassword: async (data) => {
-  const {token, newPassword } = data;
-
-  const hashedToken = crypto
-    .createHash("sha256")
-    .update(token)
-    .digest("hex");
-
-  const user = await User.findOne({
-    resetPasswordToken: hashedToken,
-    resetPasswordExpire: { $gt: Date.now() },
-  }).select("+password");
-
-  if (!user) {
-    throw new AppError(AUTH_ERRORS.INVALID_RESET_TOKEN, 400);
-  }
-
-  const isSamePassword = await user.comparePassword(newPassword);
-
-  if (isSamePassword) {
-    throw new AppError(AUTH_ERRORS.SAME_PASSWORD, 400);
-  }
-
-  user.password = newPassword;
-  user.resetPasswordToken = undefined;
-  user.resetPasswordExpire = undefined;
-
-  await user.save();
-
-  return {
-    success: true,
-    message: AUTH_SUCCESS.PASSWORD_RESET_SUCCESS,
-  };
-},
 changeRole: async (userId, role, currentUserId) => {
   const user = await User.findById(userId);
 

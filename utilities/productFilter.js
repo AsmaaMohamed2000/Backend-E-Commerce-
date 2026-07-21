@@ -8,9 +8,12 @@ module.exports=(query)=>{
             $search: query.keyword
         };
     }
-
-    if (query.category) {
+  if (query.category) {
         filter.category = query.category.toLowerCase();
+    }
+
+    if (query.featured) {
+        filter.featured=query.featured==='true'
     }
 
     if (query.subcategory) {

@@ -124,7 +124,7 @@ tokens:[
       default: null,
     },
     passwordChangedAt:{
-type:String
+type:Date
     },
   },
   {
@@ -154,7 +154,7 @@ userSchema.methods.comparePassword = async function (enteredPassword) {
 
 userSchema.methods.generateAccessToken= function(){
        const token = jwt.sign(
-          { id: this._id, role:this.role },
+          { id: this._id, role:this.role,type:'access_token' },
           process.env.ACCESS_TOKEN,
           { expiresIn: '30d' }
         )
@@ -163,7 +163,7 @@ userSchema.methods.generateAccessToken= function(){
 userSchema.methods.generateRefreshToken=async function(){
     // const {ip,device}=data
        const token = jwt.sign(
-          { id: this._id },
+          { id: this._id ,type:'refresh_token'},
           process.env.REFRESH_TOKEN,
           { expiresIn: '30d' }
         )
@@ -181,7 +181,7 @@ userSchema.methods.toJSON=function(){
          delete user.resetPasswordToken
        delete user.tokens
          delete user.__v
-         delete user.role
+       
 
      return user
 }
