@@ -2,11 +2,11 @@
   "name": "backend",
   "version": "1.0.0",
   "main": "server.js",
-  "scripts": {
-    "server": "nodemon server.js",
-    "start": "nodemon server.js",
-    "seedAdmin": "nodemon seed/seedAdmin"
-  },
+"scripts": {
+  "dev": "nodemon server.js",
+  "start": "node server.js",
+  "seedAdmin": "node seed/seedAdmin.js"
+},
   "keywords": [],
   "author": "",
   "license": "ISC",
