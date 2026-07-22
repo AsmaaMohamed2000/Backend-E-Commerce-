@@ -2,7 +2,7 @@ const mongoose=require('mongoose')
 const bcrypt=require('bcryptjs')
 const jwt = require('jsonwebtoken')
 
-const { BsNutFill } = require('react-icons/bs');
+
 
 const addressSchema = new mongoose.Schema(
   {
