@@ -217,7 +217,7 @@ backend
 Clone the repository
 
 bash
-git clone https://github.com/your-username/your-repository.git
+git clone https://github.com/AsmaaMohamed2000/Backend-E-Commerce-.git
 
 
 Move to the project folder
@@ -383,17 +383,3 @@ Webhook Updates Order
 * Unit Testing
 * Docker Support
 * CI/CD Pipeline
-
----
-
-# 👨‍💻 Author
-
-*Asmaa Mohamed Ali*
-
-Backend Developer | MERN Stack Developer
-
----
-
-# 📄 License
-
-This project is available for educational and personal use.
