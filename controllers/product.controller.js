@@ -79,20 +79,7 @@ const productController = {
         }
     },
 
-    // searchProducts: async (req, res, next) => {
-    //     try {
-
-    //         const result = await productService.searchProducts(req);
-
-    //         res.status(200).json({
-    //             success: true,
-    //             ...result
-    //         });
-
-    //     } catch (error) {
-    //         next(error);
-    //     }
-    // },
+  
 
     addReview: async (req, res, next) => {
         try {

@@ -7,9 +7,10 @@ const uploadCloudinary = require("../utilities/cloudinary");
 const { USER_ERRORS, USER_SUCCESS } = require("../constants/errors");
 const sendEmail = require("../utilities/sendEmail");
 const bcrypt = require("bcryptjs");
+const { json } = require("express");
 const userService = {
   addUser: async (data) => {
-    const { username, email, password, phone, role, addresses } = data;
+    const { username, email, password, phone, role } = data;
 
     const existingUser = await User.findOne({ email });
 
@@ -23,7 +24,6 @@ const userService = {
       password,
       phone,
       role,
-      addresses,
       isVerified: true,
     });
 
@@ -45,8 +45,8 @@ const userService = {
       await sendEmail({
         email: user.email,
         resetUrl: resetLink,
-        subject: "Reset Password",
-        type: "reset-password",
+        subject: "set-password",
+        type: "set-password",
       });
     } catch (error) {
       user.resetPasswordToken = undefined;
@@ -63,6 +63,11 @@ const userService = {
     };
   },
   getAllUsers: async ({ page, limit, search, sort, role, isVerified }) => {
+  
+      page = Math.max(Number(page) || 1,1);
+    limit = Math.min(Math.max(Number(limit) || 10,1),100);
+    const skip = (page - 1) * limit;
+  
     const filter = {};
 
     if (search) {
@@ -77,7 +82,7 @@ const userService = {
     }
 
     if (isVerified !== undefined) {
-      filter.isVerified = isVerified;
+      filter.isVerified = isVerified==='true' ||isVerified===true;
     }
 
     const sortField = sort.startsWith("-") ? sort.slice(1) : sort;
@@ -86,14 +91,14 @@ const userService = {
     const totalUsers = await User.countDocuments(filter);
      const users = await User.find(filter)
       .sort({ [sortField]: sortOrder })
-      .skip((Number(page) - 1) * Number(limit))
-      .limit(Number(limit));
+      .skip(skip)
+      .limit(limit);
 
     return {
       success: true,
       pagination: {
-        page: Number(page),
-        totalPages: Math.ceil(totalUsers / Number(limit)),
+        page,
+        totalPages: Math.ceil(totalUsers / limit),
         totalUsers,
       },
       data: users,
@@ -118,7 +123,7 @@ const userService = {
     if (!user) {
       throw new AppError(USER_ERRORS.USER_NOT_FOUND, 404);
     }
-    if (currentUser.id === id) {
+    if (currentUser.id.toString() === id.toString()) {
       throw new AppError(USER_ERRORS.CANNOT_DELETE_SELF, 400);
     }
     // Delete avatar from Cloudinary
@@ -144,13 +149,26 @@ const userService = {
     }
 
     const isAdmin = currentUser.role === "admin";
-    const isOwner = currentUser.id.toString() === user._id.toString();
+    const isOwner = currentUser?.id?.toString() === user._id.toString();
 
     if (!isAdmin && !isOwner) {
       throw new AppError(USER_ERRORS.UNAUTHORIZED, 403);
     }
 
     const updates = {};
+    // Check email if user wants to update it
+if (data.email !== undefined && isAdmin) {
+  const emailExists = await User.findOne({
+    email: data.email,
+    _id: { $ne: id },
+  });
+
+  if (emailExists) {
+    throw new AppError(USER_ERRORS.USER_ALREADY_EXISTS, 409);
+  }
+
+  updates.email = data.email;
+}
 
     if (data.username !== undefined) {
       updates.username = data.username;
@@ -171,7 +189,12 @@ const userService = {
     }
 
     if (data.addresses !== undefined) {
-      if (!Array.isArray(data.addresses)) {
+    try{
+        data.addresses=typeof data.addresses==='string'?JSON.parse(data.addresses):data.addresses
+   
+    }  catch(err){
+        throw new AppError(USER_ERRORS.INVALID_ADDRESSES, 400);
+    } if (!Array.isArray(data.addresses)) {
         throw new AppError(USER_ERRORS.INVALID_ADDRESSES, 400);
       }
 
@@ -185,13 +208,11 @@ const userService = {
 
       updates.addresses = data.addresses;
     }
-
+const oldImg=user.avatar?.publicId
     if (file) {
       const image = await uploadCloudinary(file.buffer, "users");
 
-      if (user.avatar?.publicId) {
-        await cloudinary.uploader.destroy(user.avatar.publicId);
-      }
+    
 
       updates.avatar = {
         url: image.secure_url,
@@ -204,6 +225,9 @@ const userService = {
     Object.assign(user, updates);
 
     await user.save();
+      if (file && oldImg) {
+        await cloudinary.uploader.destroy(oldImg);
+      }
 
     return {
       success: true,

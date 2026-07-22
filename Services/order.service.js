@@ -53,6 +53,9 @@ const createCashOrder = async (userId, orderData) => {
         );
       }
       product.stock -= item.quantity;
+      const price = product.discountPrice > 0 
+  ? product.discountPrice 
+  : product.price;
       await product.save({ session });
       items.push({
         product: item.product,
@@ -61,14 +64,14 @@ const createCashOrder = async (userId, orderData) => {
 
         image: item.image,
 
-        price: item.price,
+        price: price,
 
         quantity: item.quantity,
       });
     }
 
     const { subtotal, shippingFee, tax, discount, totalPrice } =
-      calculateOrderTotals(cart);
+      calculateOrderTotals(items,cart.coupon);
 
     const [order] = await Order.create(
       [
@@ -159,6 +162,9 @@ const createStripeOrder = async (userId, orderData) => {
       if (product.stock < item.quantity) {
         throw new AppError(CART_ERRORS.INSUFFICIENT_STOCK, 400);
       }
+          const price = product.discountPrice > 0 
+  ? product.discountPrice 
+  : product.price;
 
       items.push({
         product: item.product,
@@ -167,14 +173,14 @@ const createStripeOrder = async (userId, orderData) => {
 
         image: item.image,
 
-        price: item.price,
+        price: price,
 
         quantity: item.quantity,
       });
     }
 
-    const { subtotal, shippingFee, tax, discount, totalPrice } =
-      calculateOrderTotals(cart);
+       const { subtotal, shippingFee, tax, discount, totalPrice } =
+      calculateOrderTotals(items,cart.coupon);
 
  
 
@@ -254,7 +260,7 @@ module.exports = {
   },
   getMyOrders: async (userId, query) => {
     const page = Math.max(Number(query.page) || 1, 1);
-    const limit = Math.min(Math.max(Number(query.limit) || 10, 1), 100);
+    const limit = Math.min(Math.max(Number(query.limit) || 44, 1), 100);
     const skip = (page - 1) * limit;
 
     const filtered = filter(query);
@@ -317,24 +323,44 @@ module.exports = {
         throw new AppError(ORDER_ERRORS.ORDER_CANNOT_BE_CANCELLED, 400);
       }
 
-      const shouldRestoreStock =
-        order.paymentMethod === "cash" || order.paymentStatus === "paid";
+    const shouldRestoreStock =
+order.paymentMethod === "cash" ||
+order.paymentStatus === "paid";
 
-      if (shouldRestoreStock) {
-        await Promise.all(
-          order.items.map((item) =>
-            Product.findByIdAndUpdate(
-              item.product,
-              {
-                $inc: {
-                  stock: item.quantity,
-                },
-              },
-              { session },
-            ),
-          ),
-        );
-      }
+
+// refund
+if(
+ order.paymentMethod === "stripe" &&
+ order.paymentStatus === "paid"
+){
+
+ await stripe.refunds.create({
+   payment_intent: order.transactionId
+ });
+
+ order.paymentStatus="refunded";
+
+}
+
+
+// restore stock
+if(shouldRestoreStock){
+
+ await Promise.all(
+ order.items.map(item=>
+ Product.findByIdAndUpdate(
+ item.product,
+ {
+  $inc:{
+   stock:item.quantity
+  }
+ },
+ {session}
+ )
+ )
+ );
+
+}
 
       order.status = "cancelled";
       order.cancelledAt = new Date();
@@ -410,31 +436,75 @@ module.exports = {
         throw new AppError(ORDER_ERRORS.INVALID_ORDER_STATUS, 400);
       }
 
-      if (status === "cancelled") {
-        const shouldRestoreStock =
-          order.paymentMethod === "cash" || order.paymentStatus === "paid";
+     if(status==="cancelled"){
 
-        if (shouldRestoreStock) {
-          await Promise.all(
-            order.items.map((item) =>
-              Product.findByIdAndUpdate(
-                item.product,
-                {
-                  $inc: {
-                    stock: item.quantity,
-                  },
-                },
-                { session },
-              ),
-            ),
-          );
-        }
 
-        order.cancelledAt = new Date();
-      }
+const shouldRestoreStock =
+order.paymentMethod==="cash" ||
+order.paymentStatus==="paid";
+
+
+// refund stripe
+if(
+ order.paymentMethod==="stripe" &&
+ order.paymentStatus==="paid"
+){
+
+ await stripe.refunds.create({
+
+ payment_intent:
+ order.transactionId
+
+ });
+
+
+ order.paymentStatus="refunded";
+
+}
+
+
+// restore stock
+
+if(shouldRestoreStock){
+
+ await Promise.all(
+
+ order.items.map(item=>
+
+ Product.findByIdAndUpdate(
+
+ item.product,
+
+ {
+  $inc:{
+   stock:item.quantity
+  }
+ },
+
+ {session}
+
+ )
+
+ )
+
+ );
+
+}
+
+
+order.cancelledAt=new Date();
+
+}
 
       if (status === "delivered") {
         order.deliveredAt = new Date();
+    
+
+  if (order.paymentMethod === "cash") {
+    order.paymentStatus = "paid";
+    order.paidAt = new Date();
+  }
+
       }
 
       order.status = status;
@@ -486,143 +556,273 @@ module.exports = {
 
     return order;
   },
-  stripeWebhook: async (req) => {
-    const signature = req.headers["stripe-signature"];
+ stripeWebhook: async (req) => {
+  const signature = req.headers["stripe-signature"];
 
-    const event = stripe.webhooks.constructEvent(
-      req.body,
+  const event = stripe.webhooks.constructEvent(
+    req.body,
+    signature,
+    process.env.STRIPE_WEBHOOK_SECRET
+  );
 
-      signature,
+  if (event.type === "payment_intent.payment_failed") {
+    const paymentIntent = event.data.object;
 
-      process.env.STRIPE_WEBHOOK_SECRET,
-    );
+    const session = await mongoose.startSession();
 
-    if (event.type === "payment_intent.payment_failed") {
-      const paymentIntent = event.data.object;
-
-      const session = await mongoose.startSession();
+    try {
       session.startTransaction();
 
-      try {
-        const order = await Order.findById(
-          paymentIntent.metadata.orderId,
-        ).session(session);
+      const order = await Order.findById(
+        paymentIntent.metadata.orderId
+      ).session(session);
 
-        if (!order) {
-          await session.commitTransaction();
-          return;
-        }
-
-        if (order.paymentStatus === "paid" || order.status === "cancelled") {
-          await session.commitTransaction();
-          return;
-        }
-
-        order.status = "cancelled";
-        order.paymentStatus = "failed";
-        order.cancelledAt = new Date();
-
-        await order.save({ session });
-
+      if (!order) {
         await session.commitTransaction();
-
-        return order;
-      } catch (err) {
-        await session.abortTransaction();
-        throw err;
-      } finally {
-        await session.endSession();
+        return;
       }
-    } else if (event.type === "payment_intent.succeeded") {
-      const paymentIntent = event.data.object;
 
-      const session = await mongoose.startSession();
-
-      session.startTransaction();
-
-      try {
-        const order = await Order.findById(
-          paymentIntent.metadata.orderId,
-        ).session(session);
-
-        if (!order) {
-          await session.commitTransaction();
-          return;
-        }
-
-        if (order.paymentStatus === "paid") {
-          await session.commitTransaction();
-
-          return;
-        }
-        await Promise.all(
-          order.items.map(async (item) => {
-            const product = await Product.findById(item.product).session(
-              session,
-            );
-
-            if (!product) {
-              throw new AppError(PRODUCT_ERRORS.NOT_FOUND, 404);
-            }
-
-            if (product.stock < item.quantity) {
-              throw new AppError(PRODUCT_ERRORS.INSUFFICIENT_STOCK, 400);
-            }
-
-            product.stock -= item.quantity;
-
-            await product.save({ session });
-          }),
-        );
-        const cart = await Cart.findOne({ user: order.user }).session(session);
-
-        if (cart) {
-          cart.items = [];
-
-          cart.coupon = {};
-
-          await cart.save({ session });
-        }
-
-        order.paymentStatus = "paid";
-
-        order.status = "confirmed";
-
-        order.paidAt = new Date();
-
-        order.transactionId = paymentIntent.id;
-
-        await order.save({ session });
-
+      if (
+        order.paymentStatus === "paid" ||
+        order.paymentStatus === "refunded"
+      ) {
         await session.commitTransaction();
-        const user = await User.findById(order.user);
-        if (user) {
-          await sendEmail({
-            email: user.email,
-            subject: "Order Confirmation",
-            type: "order-confirmation",
-            username: user.username,
-            orderId: order._id,
-            items: order.items,
-            subtotal: order.subtotal,
-            shippingFee: order.shippingFee,
-            tax: order.tax,
-            discount: order.discount,
-            totalPrice: order.totalPrice,
-            paymentMethod: order.paymentMethod,
-          });
-        }
-
-        return order;
-      } catch (error) {
-        await session.abortTransaction();
-
-        throw error;
-      } finally {
-        await session.endSession();
+        return;
       }
+
+    order.paymentStatus="failed";
+
+order.status="cancelled";
+
+order.cancelledAt=new Date();
+  
+
+      await order.save({ session });
+
+      await session.commitTransaction();
+
+      return order;
+
+    } catch (error) {
+      await session.abortTransaction();
+      throw error;
+
+    } finally {
+      await session.endSession();
     }
-  },
+  }
+
+
+  if (event.type === "payment_intent.succeeded") {
+
+    const paymentIntent = event.data.object;
+
+    const session = await mongoose.startSession();
+
+    try {
+
+      session.startTransaction();
+
+
+      const order = await Order.findById(
+        paymentIntent.metadata.orderId
+      ).session(session);
+
+
+
+      if (!order) {
+        await session.commitTransaction();
+        return;
+      }
+
+
+
+      // prevent duplicate webhook
+      if (
+        order.paymentStatus === "paid" ||
+        order.paymentStatus === "refunded"
+      ) {
+        await session.commitTransaction();
+        return;
+      }
+
+
+
+      let outOfStock = false;
+
+
+
+      // check stock first
+      for (const item of order.items) {
+
+        const product = await Product.findById(
+          item.product
+        ).session(session);
+
+
+
+        if (
+          !product ||
+          !product.isActive ||
+          product.stock < item.quantity
+        ) {
+          outOfStock = true;
+          break;
+        }
+      }
+
+
+
+      // if stock unavailable
+      if (outOfStock) {
+
+        await session.abortTransaction();
+
+
+        await stripe.refunds.create({
+          payment_intent: paymentIntent.id,
+        });
+
+
+
+        await Order.findByIdAndUpdate(
+          order._id,
+          {
+            status: "cancelled",
+            paymentStatus: "refunded",
+            cancelledAt: new Date(),
+            refundReason: "Out of stock",
+          }
+        );
+
+
+        return {
+          message: "Payment refunded because product is out of stock"
+        };
+      }
+
+
+
+
+
+      // decrease stock
+      for (const item of order.items) {
+
+        await Product.findByIdAndUpdate(
+          item.product,
+          {
+            $inc: {
+              stock: -item.quantity
+            }
+          },
+          {
+            session
+          }
+        );
+
+      }
+
+
+
+
+
+      // clear cart
+
+      const cart = await Cart.findOne({
+        user: order.user
+      }).session(session);
+
+
+
+      if (cart) {
+
+        cart.items = [];
+        cart.coupon = {};
+
+        await cart.save({
+          session
+        });
+
+      }
+
+
+
+
+      order.paymentStatus = "paid";
+      order.status = "confirmed";
+      order.paidAt = new Date();
+      order.transactionId = paymentIntent.id;
+
+
+
+      await order.save({
+        session
+      });
+
+
+
+      await session.commitTransaction();
+
+
+
+
+      // send confirmation email
+
+      const user = await User.findById(order.user);
+
+
+      if (user) {
+
+        await sendEmail({
+
+          email: user.email,
+
+          subject: "Order Confirmation",
+
+          type: "order-confirmation",
+
+          username: user.username,
+
+          orderId: order._id,
+
+          items: order.items,
+
+          subtotal: order.subtotal,
+
+          shippingFee: order.shippingFee,
+
+          tax: order.tax,
+
+          discount: order.discount,
+
+          totalPrice: order.totalPrice,
+
+          paymentMethod: order.paymentMethod
+
+        });
+
+      }
+
+
+
+      return order;
+
+
+
+    } catch (error) {
+
+      await session.abortTransaction();
+
+      throw error;
+
+
+    } finally {
+
+      await session.endSession();
+
+    }
+  }
+},
 };
 
 

@@ -19,17 +19,7 @@ const connectDB=require('./config/db')
 const PORT=process.env.PORT || 4000
 
 connectDB()
-// const limiter = rateLimit({
-//   windowMs: 15 * 60 * 1000, // 15 minutes
-//   max: 100, // Limit each IP to 100 requests per windowMs
-//   message: 'Too many requests from this IP, please try again later.'
-// });
-// app.use('/api', limiter);
-// app.use('/auth', rateLimit({
-//   windowMs: 15 * 60 * 1000,
-//   max: 20, // 20 requests per 15 mins for auth
-//   message: 'Too many auth requests from this IP, please try again later.'
-// }));
+
 app.use(cors({
   origin: "http://localhost:5173",
   credentials: true,
@@ -40,9 +30,7 @@ app.use('/api/stripe',webhook)
 
 app.use(express.json())
 app.use(cookieParser())
-// if (process.env.NODE_ENV !== 'production') {
-//   app.use(morgan('dev'));
-// }
+
 app.use('/api/auth',authRoutes)
 app.use('/api/users',userRoutes)
 

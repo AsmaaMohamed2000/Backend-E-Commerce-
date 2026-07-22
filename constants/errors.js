@@ -73,7 +73,8 @@ const ORDER_ERRORS = {
     ORDER_ACCESS_DENIED: "You are not authorized to access this order.",
     PRODUCT_NOT_AVAILABLE: " product are no longer available.",
     PRODUCT_INACTIVE: "One or more products are inactive.",
-    PAYMENT_ALREADY_COMPLETED: "Order has already been paid."
+    PAYMENT_ALREADY_COMPLETED: "Order has already been paid.",
+    ORDER_ALREADY_DELIVERED:"order already delivered"
 };
 
 ;

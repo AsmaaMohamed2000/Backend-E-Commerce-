@@ -13,15 +13,7 @@ const userController = {
 
   getAllUsers: async (req, res, next) => {
     try {
-        // page,
-        // limit,
-        // search: req.query.search || "",
-        // sort: req.query.sort || "-createdAt",
-        // role: req.query.role,
-        // isVerified: req.query.isVerified,
-      // const page = Math.max(Number(req.query.page) || 1, 1);
-      // const limit = Math.min(Math.max(Number(req.query.limit) || 10, 1), 20);
-       const result = await userService.getAllUsers(req.validateQuery );
+         const result = await userService.getAllUsers(req.validateQuery );
       res.status(200).json(result);
     } catch (error) {
       next(error);

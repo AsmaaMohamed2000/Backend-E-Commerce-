@@ -226,7 +226,27 @@ updateProduct: async (req) => {
             400
         );
     }
+let tags = req.body.tags;
 
+if (tags !== undefined) {
+
+    if (typeof tags === "string") {
+        try {
+            tags = JSON.parse(tags);
+        } catch {
+            tags = tags
+                .split(",")
+                .map(tag => tag.trim())
+                .filter(Boolean);
+        }
+    }
+
+    if (Array.isArray(tags)) {
+        tags = tags.map(tag => tag.trim().toLowerCase());
+    }
+
+    product.tags = tags;
+}
     const fields = [
         "name",
         "shortDescription",
@@ -238,7 +258,6 @@ updateProduct: async (req) => {
         "category",
         "subcategory",
         "brand",
-        "tags",
         "featured",
         "isActive"
     ];
