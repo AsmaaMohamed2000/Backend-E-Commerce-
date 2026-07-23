@@ -30,7 +30,9 @@ app.use('/api/stripe',webhook)
 
 app.use(express.json())
 app.use(cookieParser())
-
+app.get('/', (req, res) => {
+  res.send('Backend API is running successfully!');
+});
 app.use('/api/auth',authRoutes)
 app.use('/api/users',userRoutes)
 
