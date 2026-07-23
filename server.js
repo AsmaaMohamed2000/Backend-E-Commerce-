@@ -18,7 +18,7 @@ const connectDB=require('./config/db')
 
 const PORT=process.env.PORT || 4000
 
-connectDB()
+await connectDB()
 
 app.use(cors({
   origin: "http://localhost:5173",
