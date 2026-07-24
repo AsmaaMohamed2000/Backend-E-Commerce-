@@ -21,7 +21,6 @@ const errMiddleware = require('./middlewares/error.middleware');
 const PORT = process.env.PORT || 4000;
 
 
-connectDB();
 
 
 const rawClientUrl = process.env.CLIENT_URL || '';
@@ -50,6 +49,14 @@ app.use(cors({
 
 
 app.use('/api/stripe', webhook);
+app.use(async (req, res, next) => {
+  try {
+    await connectDB();
+    next();
+  } catch (err) {
+    next(err);
+  }
+});
 
 app.use(express.json());
 app.use(cookieParser());

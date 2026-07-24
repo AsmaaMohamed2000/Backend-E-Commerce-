@@ -3,6 +3,7 @@ const {
   CART_ERRORS,
   PRODUCT_ERRORS,
 } = require("../constants/errors");
+const connectDB=require('../config/db')
 const calculateOrderTotals = require("../utilities/calcOrderTotal");
 const Cart = require("../models/cart.model");
 const User = require("../models/user.model");
@@ -519,6 +520,7 @@ module.exports = {
     return order;
   },
   stripeWebhook: async (req) => {
+    await connectDB()
     const signature = req.headers["stripe-signature"];
 
     const event = stripe.webhooks.constructEvent(
@@ -588,7 +590,7 @@ module.exports = {
           return;
         }
 
-        // prevent duplicate webhook
+     
         if (
           order.paymentStatus === "paid" ||
           order.paymentStatus === "refunded"
@@ -599,7 +601,7 @@ module.exports = {
 
         let outOfStock = false;
 
-        // check stock first
+    
         for (const item of order.items) {
           const product = await Product.findById(item.product).session(session);
 
@@ -609,7 +611,7 @@ module.exports = {
           }
         }
 
-        // if stock unavailable
+     
         if (outOfStock) {
           await session.abortTransaction();
 
@@ -629,7 +631,7 @@ module.exports = {
           };
         }
 
-        // decrease stock
+      
         for (const item of order.items) {
           await Product.findByIdAndUpdate(
             item.product,
@@ -644,7 +646,7 @@ module.exports = {
           );
         }
 
-        // clear cart
+     
 
         const cart = await Cart.findOne({
           user: order.user,
@@ -670,7 +672,7 @@ module.exports = {
 
         await session.commitTransaction();
 
-        // send confirmation email
+       
 
         const user = await User.findById(order.user);
 
