@@ -20,7 +20,7 @@ const errMiddleware = require('./middlewares/error.middleware');
 
 const PORT = process.env.PORT || 4000;
 
-app.use('/api/stripe', webhook);
+
 app.use(async (req, res, next) => {
   try {
     await connectDB();
@@ -30,7 +30,7 @@ app.use(async (req, res, next) => {
   }
 });
 
-
+app.use('/api/stripe', webhook);
 const rawClientUrl = process.env.CLIENT_URL || '';
 const cleanClientUrl = rawClientUrl.replace(/\/$/, '');
 
