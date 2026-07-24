@@ -1,26 +1,26 @@
-// api/index.js
-const dotenv = require('dotenv');
-dotenv.config();
 
-const app = require('../app');
-const connectDB = require('../config/db');
+// const dotenv = require('dotenv');
+// dotenv.config();
 
-let isConnected = false;
+// const app = require('../app');
+// const connectDB = require('../config/db');
 
-module.exports = async (req, res) => {
-  // طباعة سريعة لمعرفة حالة المتغيرات عند كل طلب
-  console.log("--- New Request Received ---");
-  console.log("Mongo URL exists?", !!process.env.MONGO_URL);
+// let isConnected = false;
 
-  if (!isConnected) {
-    try {
-      await connectDB();
-      isConnected = true;
-      console.log("MongoDB connection established successfully.");
-    } catch (error) {
-      console.error("MongoDB connection error:", error.message);
-    }
-  }
+// module.exports = async (req, res) => {
 
-  return app(req, res);
-};
+//   console.log("--- New Request Received ---");
+//   console.log("Mongo URL exists?", !!process.env.MONGO_URL);
+
+//   if (!isConnected) {
+//     try {
+//       await connectDB();
+//       isConnected = true;
+//       console.log("MongoDB connection established successfully.");
+//     } catch (error) {
+//       console.error("MongoDB connection error:", error.message);
+//     }
+//   }
+
+//   return app(req, res);
+// };
