@@ -11,7 +11,7 @@ module.exports = async (req, res) => {
     await connectDB();
     isConnected = true;
   }
-
+console.log("Mongo URL exists?", !!process.env.MONGO_URL);
   return app(req, res);
 
 };
