@@ -21,9 +21,7 @@ const errMiddleware = require('./middlewares/error.middleware');
 const PORT = process.env.PORT || 4000;
 
 
-
-   connectDB();
-   
+connectDB();
 
 
 const rawClientUrl = process.env.CLIENT_URL || '';
@@ -51,8 +49,8 @@ app.use(cors({
 }));
 
 
-
 app.use('/api/stripe', webhook);
+
 app.use(express.json());
 app.use(cookieParser());
 
