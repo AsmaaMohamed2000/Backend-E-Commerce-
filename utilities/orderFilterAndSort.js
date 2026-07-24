@@ -4,9 +4,6 @@ const filtered = {
     };
 
    const {user,status,paymentStatus,paymentMethod,search,fromDate,toDate} =query
-    //   if(userId){
-    //     filtered.user=userId
-    // }
      if (user) {
         filtered.user = user;
     }

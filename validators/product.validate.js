@@ -1,6 +1,5 @@
 const Joi = require("joi");
 
-// Create Product
 const createProductSchema = Joi.object({
   name: Joi.string().trim().max(200).required(),
 
@@ -33,7 +32,6 @@ const createProductSchema = Joi.object({
 });
 
 
-// Update Product
 const updateProductSchema = Joi.object({
   name: Joi.string().trim().max(200),
 
@@ -71,7 +69,6 @@ const updateProductSchema = Joi.object({
 });
 
 
-// Add Review
 const reviewSchema = Joi.object({
   rating: Joi.number()
     .integer()

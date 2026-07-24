@@ -126,7 +126,6 @@ const userService = {
     if (currentUser.id.toString() === id.toString()) {
       throw new AppError(USER_ERRORS.CANNOT_DELETE_SELF, 400);
     }
-    // Delete avatar from Cloudinary
     if (user.avatar?.publicId) {
       await cloudinary.uploader.destroy(user.avatar.publicId);
     }
@@ -156,7 +155,7 @@ const userService = {
     }
 
     const updates = {};
-    // Check email if user wants to update it
+  
 if (data.email !== undefined && isAdmin) {
   const emailExists = await User.findOne({
     email: data.email,

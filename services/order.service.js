@@ -321,7 +321,6 @@ module.exports = {
       const shouldRestoreStock =
         order.paymentMethod === "cash" || order.paymentStatus === "paid";
 
-      // refund
       if (order.paymentMethod === "stripe" && order.paymentStatus === "paid") {
         await stripe.refunds.create({
           payment_intent: order.transactionId,
@@ -330,7 +329,6 @@ module.exports = {
         order.paymentStatus = "refunded";
       }
 
-      // restore stock
       if (shouldRestoreStock) {
         await Promise.all(
           order.items.map((item) =>
@@ -425,7 +423,6 @@ module.exports = {
         const shouldRestoreStock =
           order.paymentMethod === "cash" || order.paymentStatus === "paid";
 
-        // refund stripe
         if (
           order.paymentMethod === "stripe" &&
           order.paymentStatus === "paid"
@@ -437,7 +434,6 @@ module.exports = {
           order.paymentStatus = "refunded";
         }
 
-        // restore stock
 
         if (shouldRestoreStock) {
           await Promise.all(
@@ -588,7 +584,6 @@ module.exports = {
           return;
         }
 
-        // prevent duplicate webhook
         if (
           order.paymentStatus === "paid" ||
           order.paymentStatus === "refunded"
@@ -599,7 +594,6 @@ module.exports = {
 
         let outOfStock = false;
 
-        // check stock first
         for (const item of order.items) {
           const product = await Product.findById(item.product).session(session);
 
@@ -609,7 +603,6 @@ module.exports = {
           }
         }
 
-        // if stock unavailable
         if (outOfStock) {
           await session.abortTransaction();
 
@@ -629,7 +622,6 @@ module.exports = {
           };
         }
 
-        // decrease stock
         for (const item of order.items) {
           await Product.findByIdAndUpdate(
             item.product,
@@ -644,7 +636,7 @@ module.exports = {
           );
         }
 
-        // clear cart
+     
 
         const cart = await Cart.findOne({
           user: order.user,
@@ -670,7 +662,7 @@ module.exports = {
 
         await session.commitTransaction();
 
-        // send confirmation email
+    
 
         const user = await User.findById(order.user);
 

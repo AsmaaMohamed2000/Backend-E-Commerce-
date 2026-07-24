@@ -5,7 +5,6 @@ const validate = require("../validators/order.validate");
 const express = require("express");
 const router = express.Router();
 
-// User
 router.post(
     "/",
     auth.auth,
@@ -31,7 +30,7 @@ router.patch(
     orderController.cancelOrder
 );
 
-// Admin
+
 router.get(
     "/admin",
     auth.auth,

@@ -36,7 +36,6 @@ if (existingOtp) {
    
     const hashedOtp = await bcrypt.hash(plainOtp, 10);
 
-    // Save OTP
     await Otp.create({
       email,
       code: hashedOtp,

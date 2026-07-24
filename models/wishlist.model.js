@@ -28,7 +28,7 @@ wishlistSchema.pre(/^find/, function () {
       "name slug shortDescription price discountPrice images averageRating numReviews stock  brand",
   });
 
-  // next();
+ 
 });
 
 module.exports = mongoose.model("Wishlist", wishlistSchema);

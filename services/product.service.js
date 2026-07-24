@@ -278,7 +278,6 @@ if (tags !== undefined) {
 
     try {
 
-        // Upload new images first
         if (req.files?.length) {
 
             for (const file of req.files) {
@@ -299,7 +298,6 @@ if (tags !== undefined) {
 
         }
 
-        // Delete old images after upload succeeds
         for (const publicId of deletedImages) {
                if(product.images.some(img=>img.public_id===publicId))
          {
@@ -317,7 +315,6 @@ if (tags !== undefined) {
 
     } catch (error) {
 
-        // Rollback uploaded images
         for (const image of uploadedImages) {
             await cloudinary.uploader.destroy(image.public_id);
         }

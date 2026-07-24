@@ -52,9 +52,9 @@ const ValidateQuery= (schema) => {
         )
       })
     }
-console.log(value)
+
     req.validateQuery = value
-console.log(req.validateQuery )
+
     next()
   }
 }

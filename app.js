@@ -14,11 +14,11 @@ const webhook=require('./routes/webhook.route')
 const errMiddleware=require('./middlewares/error.middleware')
 const adminRoutes=require('./routes/admin.route')
 const cors=require('cors')
-const connectDB=require('./config/db')
+// const connectDB=require('./config/db')
 
-const PORT=process.env.PORT || 4000
+// const PORT=process.env.PORT || 4000
 
- connectDB()
+//  connectDB()
 
 app.use(cors({
   origin: "http://localhost:5173",
@@ -42,6 +42,7 @@ app.use('/api/wishlist',wishlistRoutes)
 app.use('/api/orders',orderRoutes)
 app.use('/api/admin',adminRoutes)
 app.use(errMiddleware)
-app.listen(PORT,()=>{
-    console.log(`server running on port ${PORT}`)
-})
+// app.listen(PORT,()=>{
+//     console.log(`server running on port ${PORT}`)
+// })
+module.exports=app
